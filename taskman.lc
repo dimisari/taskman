@@ -1,0 +1,245 @@
+COMMENT
+types
+
+TUPLE TYPE
+Task = String x Tasks
+(desc, subtasks)
+
+TYPE NICKNAME
+Tasks = ListOf(Task)s
+
+TYPE NICKNAME
+Path = String
+
+TYPE NICKNAME
+Line = String
+
+TYPE NICKNAME
+Lines = ListOf(Line)s
+
+COMMENT
+main
+
+main : Program
+  = choose_task_category
+
+list_and_choose_action_for_file(_) : Path => Program
+  = p =>
+    list_tasks_of_file(p) ;
+    print("Enter to quit or any key to make changes")and_get_line >> ?
+      "" => do_nothing
+      ... => choose_action_for_file(p) ; list_tasks_of_file(p)
+
+choose_task_category : Program
+  = print(""); print("Choose task category by number") ;
+    category_choices_and_programs -> list(_)and_choose_from(_)
+
+choose_action_for_file(_) : Path => Program
+  = act_progs_for(_) o> list(act_choices)and_choose_from(_)
+
+list(_)and_choose_from(_) : ListOf(String)s x ListOf(Program)s => Program
+  = (choices_list, programs) =>
+    list_choices_from_list(choices_list) ;
+    get_line >> from_string(_) o> elem(_)of(programs)
+
+list_tasks_of_file(_) : Path => Program
+  = tasks_from_file(_) o> (_ >> print_top_level_tasks(_))
+
+list_choices_from_list(_) : ListOf(String)s => Program
+  = choices_from_list(_)to_string o> print(_)
+
+choices_from_list(_)to_string : ListOf(String)s => String
+  = add_one_indexes_to(_) o> apply((i, s) => i + ". " + s + "\n")to_all_in(_) o>
+    concat_lists(_) o> ("\n" + _)
+
+COMMENT
+paths
+
+todo_dir_path : Path
+  = "/home/gnostis/.local/share/Todo/"
+
+next_file_path : Path
+  = todo_dir_path + "Next"
+
+waiting_file_path : Path
+  = todo_dir_path + "Waiting"
+
+later_file_path : Path
+  = todo_dir_path + "Later"
+
+projects_file_path : Path
+  = todo_dir_path + "Projects"
+
+schedule_file_path : Path
+  = todo_dir_path + "Schedule"
+
+COMMENT
+tasks from file
+
+next_tasks : ProgramWith(Tasks)
+  = tasks_from_file(next_file_path)
+
+tasks_from_file(_) : Path => ProgramWith(Tasks)
+  = read_file(_) o> apply(tasks_from_string(_))inside(_)
+
+tasks_from_string(_) : String => Tasks
+  = split(_)to_lines o> tasks_from_lines(_)
+
+tasks_from_lines(_) : Lines => Tasks
+  = tasks_of_level(0)from_lines(_) o> ?
+    (ts, []) => ts
+    ... => error("Not all lines were put into tasks")
+
+tasks_of_level(_)from_lines(_) : Int x Lines => Tasks x Lines
+  = (lvl, ?)
+    [] => ([],[])
+    [l, ls = ...] =>
+      task_of_level(lvl)from_lines(l, ls) -> ?
+        a_value =>
+          the_value -> (t, new_ls) =>
+          tasks_of_level(lvl)from_lines(new_ls) -> (ts, ls) =>
+          (t + ts, ls)
+        no_value =>
+          ([], l + ls)
+
+task_of_level(_)from_lines(_,_) : Int x Line x Lines => Possibly(Task x Lines)
+  = (lvl, l, ls) =>
+    description_from(l)in_level(lvl) -> ?
+      a_value =>
+        tasks_of_level(lvl + 1)from_lines(ls) -> (sts, new_ls) =>
+        a_value--((the_value, sts), new_ls)
+      no_value =>
+        no_value
+
+description_from(_)in_level(_) : Line x Int => Possibly(String)
+  = (l, i) =>
+    drop(i)levels_of_indentation_from(l) -> ?
+      a_value =>
+        the_value -> ?
+          ['-', ' ', s = ...] => a_value--s
+          ... => no_value
+      no_value => no_value
+
+drop(_)levels_of_indentation_from(_) : Int x String => Possibly(String)
+  = ?
+    (0, s) => a_value--s
+    (i, [' ', ' ', s = ...]) => drop(i - 1)levels_of_indentation_from(s)
+    (i, s) => no_value
+
+COMMENT
+manipulating tasks
+
+add_task(_)to_file(_) : String x Path => Program
+  = (s, p) => append("- " + s + "\n")to_file(p)
+
+change_tasks_of(_)with(_) : Path x (Tasks => Tasks) => Program
+  = (p, f(_)) => tasks_from_file(p) >> f(_) o> write_tasks(_)to_file(p)
+
+move_task(_)to(_)in_file(_) : Int x Int x Path => Program
+  = (i, j, p) => change_tasks_of(p)with(move_task(i - 1)to(j - 1)in(_))
+
+remove_task_at_index(_)in(_) : Int x Path => Program
+  = (i, p) => change_tasks_of(p)with(remove_task_of_index(i - 1)from(_))
+
+move_task(_)to(_)in(_) : Int x Int x Tasks => Tasks
+  = (i, j, ts) =>
+    split(ts)at_index(i) -> remove_and_insert_elem(_)
+    where
+    remove_and_insert_elem(_) : Tasks x Tasks => Tasks
+      = (before, [elem, after = ...]) =>
+        (before_l > j) -> ?
+          true => insert(elem)at_index(j)in(before) + after
+          false => before + insert(elem)at_index(j - before_l)in(after)
+        where
+        before_l : Int
+          = length_of(before)
+
+insert(_)at_index(_)in(_) : Task x Int x Tasks => Tasks
+  = (t, ?, ?)
+    (0, l) => t + l
+    (i, []) => error("List not big enough to insert element")
+    (i, [t1, ts = ...]) => t1 + insert(t)at_index(i - 1)in(ts)
+
+remove_task_of_index(_)from(_) : Int x Tasks => Tasks
+  = (i, ts) =>
+    split(ts)at_index(i) -> (before, [*, after = ...]) => before + after
+
+COMMENT
+writing tasks to file
+
+write_tasks(_)to_file(_) : Tasks x Path => Program
+  = (ts, p) => write(tasks(ts)to_string)to_file(p)
+
+COMMENT
+tasks to string
+
+tasks(_)to_string : Tasks => String
+  = tasks(_)with_indetation(0)to_string
+
+tasks(_)with_indetation(_)to_string : Tasks x Int => String
+  = (ts, i) =>
+    apply(task(_)with_indetation(i)to_string)to_all_in(ts) ->
+    concat_lists(_)
+
+task(_)with_indetation(_)to_string : Task x Int => String
+  = (t, i) =>
+    i * 2 * ' ' + "- " + t.desc + "\n" +
+    tasks(t.subtasks)with_indetation(i + 1)to_string
+
+COMMENT
+printing tasks
+
+print_tasks(_) : Tasks => Program
+  = print_tasks(_)with_indetation(0)
+
+print_tasks(_)with_indetation(_) : Tasks x Int => Program
+  = (ts, i) => for_all_in(ts, print_task(_)with_indetation(i))
+
+print_task(_)with_indetation(_) : Task x Int => Program
+  = (t, i) =>
+    print(i * 2 * ' ' + "- " + t.desc) ;
+    print_tasks(t.subtasks)with_indetation(i + 1)
+
+print_top_level_tasks(_) : Tasks => Program
+  = ts =>
+    print("") ;
+    for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc)) ;
+    print("")
+
+COMMENT
+action choices and programs
+
+act_choices : ListOf(String)s
+  = ["add", "move", "remove"]
+
+act_progs_for(_) : Path => ListOf(Program)s
+  = p => [add_task_to(p), move_task_in(p), remove_task_from(p)]
+
+add_task_to(_) : Path => Program
+  = p => print("Describe the task")and_get_line >> add_task(_)to_file(p)
+
+move_task_in(_) : Path => Program
+  = p =>
+    print("Choose task by number")and_get_line >> i =>
+    print("Move to number")and_get_line >> j =>
+    move_task(from_string(i))to(from_string(j))in_file(p)
+
+remove_task_from(_) : Path => Program
+  = p =>
+    print("Remove task by number")and_get_line >>
+    from_string(_) o> remove_task_at_index(_)in(p)
+
+COMMENT
+category choices and programs
+
+category_choices_and_programs : ListOf(String)s x ListOf(Program)s
+  = ( ["Next", "Waiting", "Later", "Projects", "Schedule"]
+    , [next, waiting, later, projects, schedule]
+    )
+
+next, waiting, later, projects, schedule : all Program
+  = list_and_choose_action_for_file(next_file_path)
+  , list_and_choose_action_for_file(waiting_file_path)
+  , list_and_choose_action_for_file(later_file_path)
+  , list_and_choose_action_for_file(projects_file_path)
+  , list_and_choose_action_for_file(schedule_file_path)
