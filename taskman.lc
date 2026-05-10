@@ -25,22 +25,23 @@ main : Program
 
 list_and_choose_action_for_file(_) : Path => Program
   = p =>
-    list_tasks_of_file(p) ;
-    print("Enter to quit or any key to make changes")and_get_line >> ?
-      "" => do_nothing
-      ... => choose_action_for_file(p) ; list_tasks_of_file(p)
+    list_tasks_of_file(p) ; choose_action_for_file(p)
 
 choose_task_category : Program
   = print(""); print("Choose task category by number") ;
     category_choices_and_programs -> list(_)and_choose_from(_)
 
 choose_action_for_file(_) : Path => Program
-  = act_progs_for(_) o> list(act_choices)and_choose_from(_)
+  = p =>
+    print(""); print("Choose action by number") ;
+    act_progs_for(p) -> list(act_choices)and_choose_from(_)
 
 list(_)and_choose_from(_) : ListOf(String)s x ListOf(Program)s => Program
   = (choices_list, programs) =>
     list_choices_from_list(choices_list) ;
-    get_line >> from_string(_) o> elem(_)of(programs)
+    get_line >> ?
+      "" => do_nothing
+      l => print(""); from_string(l) -> elem(_)of(programs)
 
 list_tasks_of_file(_) : Path => Program
   = tasks_from_file(_) o> (_ >> print_top_level_tasks(_))
@@ -49,8 +50,9 @@ list_choices_from_list(_) : ListOf(String)s => Program
   = choices_from_list(_)to_string o> print(_)
 
 choices_from_list(_)to_string : ListOf(String)s => String
-  = add_one_indexes_to(_) o> apply((i, s) => i + ". " + s + "\n")to_all_in(_) o>
-    concat_lists(_) o> ("\n" + _)
+  = add_one_indexes_to(_) o>
+    apply((i, s) => i + ". " + s + "  ")to_all_in(_) o>
+    concat_lists(_) o> (_ + "(Enter to quit)" )
 
 COMMENT
 paths
@@ -201,10 +203,7 @@ print_task(_)with_indetation(_) : Task x Int => Program
     print_tasks(t.subtasks)with_indetation(i + 1)
 
 print_top_level_tasks(_) : Tasks => Program
-  = ts =>
-    print("") ;
-    for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc)) ;
-    print("")
+  = ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc))
 
 COMMENT
 action choices and programs
@@ -213,6 +212,12 @@ act_choices : ListOf(String)s
   = ["add", "move", "remove"]
 
 act_progs_for(_) : Path => ListOf(Program)s
+  = p => apply(_ ; list_tasks)to_all_in(act_progs_for(p)no_list_after)
+    where
+    list_tasks : Program
+      = print(""); list_tasks_of_file(p); print("")
+
+act_progs_for(_)no_list_after : Path => ListOf(Program)s
   = p => [add_task_to(p), move_task_in(p), remove_task_from(p)]
 
 add_task_to(_) : Path => Program
