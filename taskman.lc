@@ -17,6 +17,12 @@ Line = String
 TYPE NICKNAME
 Lines = ListOf(Line)s
 
+TYPE NICKNAME
+Strings = ListOf(String)s
+
+TYPE NICKNAME
+Programs = ListOf(Program)s
+
 COMMENT
 main
 
@@ -24,21 +30,24 @@ main : Program
   = choose_task_category
 
 list_and_choose_action_for_file(_) : Path => Program
-  = p =>
-    list_tasks_of_file(p) ; choose_action_for_file(p)
+  = p => list_tasks_of_file(p) ; choose_action_for_file(p)
 
 choose_task_category : Program
-  = print(""); print("Choose task category by number") ;
-    category_choices_and_programs -> list(_)and_choose_from(_)
+  = category_prompt ; choose_from(category_programs)
+
+category_prompt : Program
+  = say("Choose task category by number")and_list_choices_from(category_choices)
 
 choose_action_for_file(_) : Path => Program
   = p =>
-    print(""); print("Choose action by number") ;
-    act_progs_for(p) -> list(act_choices)and_choose_from(_)
+    say("Choose action by number")and_list_choices_from(act_choices);
+    choose_from(act_progs_for(p))
 
-list(_)and_choose_from(_) : ListOf(String)s x ListOf(Program)s => Program
-  = (choices_list, programs) =>
-    list_choices_from_list(choices_list) ;
+say(_)and_list_choices_from(_) : String x Strings => Program
+  = (to_say, choices) => print("\n" + to_say) ; list_choices_from_list(choices)
+
+choose_from(_) : Programs => Program
+  = programs =>
     get_line >> ?
       "" => do_nothing
       l => print(""); from_string(l) -> elem(_)of(programs)
@@ -46,10 +55,10 @@ list(_)and_choose_from(_) : ListOf(String)s x ListOf(Program)s => Program
 list_tasks_of_file(_) : Path => Program
   = tasks_from_file(_) o> (_ >> print_top_level_tasks(_))
 
-list_choices_from_list(_) : ListOf(String)s => Program
+list_choices_from_list(_) : Strings => Program
   = choices_from_list(_)to_string o> print(_)
 
-choices_from_list(_)to_string : ListOf(String)s => String
+choices_from_list(_)to_string : Strings => String
   = add_one_indexes_to(_) o>
     apply((i, s) => i + ". " + s + "  ")to_all_in(_) o>
     concat_lists(_) o> (_ + "(Enter to quit)" )
@@ -60,12 +69,11 @@ paths
 todo_dir : Path
   = "/home/gnostis/.local/share/Todo/"
 
-next_file, waiting_file, later_file, projects_file, schedule_file : all Path
-  = todo_dir + "Next"
-  , todo_dir + "Waiting"
-  , todo_dir + "Later"
-  , todo_dir + "Projects"
-  , todo_dir + "Schedule"
+file_list : ListOf(Path)s
+  = apply(todo_dir + _)to_all_in(file_names_in_dir)
+
+file_names_in_dir : Strings
+  = ["Next", "Schedule", "Waiting", "Projects", "Later"]
 
 COMMENT
 tasks from file
@@ -120,8 +128,11 @@ drop(_)levels_of_indentation_from(_) : Int x String => Possibly(String)
 COMMENT
 manipulating tasks
 
-add_task(_)to_file(_) : String x Path => Program
+add_str(_)as_task_to_file(_) : String x Path => Program
   = (s, p) => append("- " + s + "\n")to_file(p)
+
+add_task(_)to_file(_) : Task x Path => Program
+  = (t, p) => append(task(t)to_string)to_file(p)
 
 change_tasks_of(_)with(_) : Path x (Tasks => Tasks) => Program
   = (p, f(_)) => tasks_from_file(p) >> f(_) o> write_tasks(_)to_file(p)
@@ -155,6 +166,10 @@ remove_task_of_index(_)from(_) : Int x Tasks => Tasks
   = (i, ts) =>
     split(ts)at_index(i) -> (before, [*, after = ...]) => before + after
 
+remove_and_get_task_of_index(_)from(_) : Int x Tasks => Tasks x Task
+  = (i, ts) =>
+    split(ts)at_index(i) -> (before, [t, after = ...]) => (before + after, t)
+
 COMMENT
 writing tasks to file
 
@@ -177,6 +192,9 @@ task(_)with_indetation(_)to_string : Task x Int => String
     i * 2 * ' ' + "- " + t.desc + "\n" +
     tasks(t.subtasks)with_indetation(i + 1)to_string
 
+task(_)to_string : Task => String
+  = task(_)with_indetation(0)to_string
+
 COMMENT
 printing tasks
 
@@ -197,26 +215,39 @@ print_top_level_tasks(_) : Tasks => Program
 COMMENT
 action choices and programs
 
-act_choices : ListOf(String)s
-  = ["add", "move", "remove"]
+act_choices : Strings
+  = ["Add", "Move", "Remove", "Move to other category"]
 
-act_progs_for(_) : Path => ListOf(Program)s
-  = p => apply(_ ; list_tasks)to_all_in(act_progs_for(p)no_list_after)
+act_progs_for(_) : Path => Programs
+  = p =>
+    apply(_ ; list_tasks)to_all_in(act_progs_for(p)no_list_after) +
+    move_task_from(p)
     where
     list_tasks : Program
       = print(""); list_tasks_of_file(p); print("")
 
-act_progs_for(_)no_list_after : Path => ListOf(Program)s
+act_progs_for(_)no_list_after : Path => Programs
   = p => [add_task_to(p), move_task_in(p), remove_task_from(p)]
 
 add_task_to(_) : Path => Program
-  = p => print("Describe the task")and_get_line >> add_task(_)to_file(p)
+  = p => print("Describe the task")and_get_line >> add_str(_)as_task_to_file(p)
 
 move_task_in(_) : Path => Program
   = p =>
-    print("Choose task by number")and_get_line >> i =>
+    user_task_choice >> i =>
     print("Move to number")and_get_line >> j =>
-    move_task(from_string(i))to(from_string(j))in_file(p)
+    move_task(i)to(from_string(j))in_file(p)
+
+move_task_from(_) : Path => Program
+  = p =>
+    user_task_choice >> i =>
+    category_prompt
+
+COMMENT
+remove_and_get_task_of_index(_)from(_)
+
+user_task_choice : ProgramWith(Int)
+  = apply(from_string(_))inside(print("Choose task by number")and_get_line)
 
 remove_task_from(_) : Path => Program
   = p =>
@@ -226,14 +257,8 @@ remove_task_from(_) : Path => Program
 COMMENT
 category choices and programs
 
-category_choices_and_programs : ListOf(String)s x ListOf(Program)s
-  = ( ["Next", "Waiting", "Later", "Projects", "Schedule"]
-    , [next, waiting, later, projects, schedule]
-    )
+category_choices : Strings
+  = file_names_in_dir
 
-next, waiting, later, projects, schedule : all Program
-  = list_and_choose_action_for_file(next_file)
-  , list_and_choose_action_for_file(waiting_file)
-  , list_and_choose_action_for_file(later_file)
-  , list_and_choose_action_for_file(projects_file)
-  , list_and_choose_action_for_file(schedule_file)
+category_programs : Programs
+  = apply(list_and_choose_action_for_file(_))to_all_in(file_list)
