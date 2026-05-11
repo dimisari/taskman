@@ -57,29 +57,18 @@ choices_from_list(_)to_string : ListOf(String)s => String
 COMMENT
 paths
 
-todo_dir_path : Path
+todo_dir : Path
   = "/home/gnostis/.local/share/Todo/"
 
-next_file_path : Path
-  = todo_dir_path + "Next"
-
-waiting_file_path : Path
-  = todo_dir_path + "Waiting"
-
-later_file_path : Path
-  = todo_dir_path + "Later"
-
-projects_file_path : Path
-  = todo_dir_path + "Projects"
-
-schedule_file_path : Path
-  = todo_dir_path + "Schedule"
+next_file, waiting_file, later_file, projects_file, schedule_file : all Path
+  = todo_dir + "Next"
+  , todo_dir + "Waiting"
+  , todo_dir + "Later"
+  , todo_dir + "Projects"
+  , todo_dir + "Schedule"
 
 COMMENT
 tasks from file
-
-next_tasks : ProgramWith(Tasks)
-  = tasks_from_file(next_file_path)
 
 tasks_from_file(_) : Path => ProgramWith(Tasks)
   = read_file(_) o> apply(tasks_from_string(_))inside(_)
@@ -243,8 +232,8 @@ category_choices_and_programs : ListOf(String)s x ListOf(Program)s
     )
 
 next, waiting, later, projects, schedule : all Program
-  = list_and_choose_action_for_file(next_file_path)
-  , list_and_choose_action_for_file(waiting_file_path)
-  , list_and_choose_action_for_file(later_file_path)
-  , list_and_choose_action_for_file(projects_file_path)
-  , list_and_choose_action_for_file(schedule_file_path)
+  = list_and_choose_action_for_file(next_file)
+  , list_and_choose_action_for_file(waiting_file)
+  , list_and_choose_action_for_file(later_file)
+  , list_and_choose_action_for_file(projects_file)
+  , list_and_choose_action_for_file(schedule_file)
