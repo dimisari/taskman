@@ -23,11 +23,21 @@ Strings = ListOf(String)s
 TYPE NICKNAME
 Programs = ListOf(Program)s
 
+TYPE NICKNAME
+Location = TaskPath x Path
+
+TYPE NICKNAME
+TaskPath = ListOf(Int)s
+
 COMMENT
 main
 
+COMMENT
 main : Program
   = choose_task_category
+
+main : Program
+  = remove_task_at_index(1)in_location(([2,1], todo_dir + "Projects"))
 
 choose_task_category : Program
   = say(to_say)and_list_choices_from(category_choices) ;
@@ -45,8 +55,11 @@ choose_from(_) : Programs => Program
       "" => do_nothing
       l => print(""); from_string(l) -> elem(_)of(programs)
 
+list_tasks_of_location(_) : Location => Program
+  = tasks_from_location(_) o> (_ >> print_tasks(_))
+
 list_tasks_of_file(_) : Path => Program
-  = tasks_from_file(_) o> (_ >> print_top_level_tasks(_))
+  = tasks_from_file(_) o> (_ >> print_tasks(_))
 
 list_choices_from_list(_) : Strings => Program
   = choices_from_list(_)to_string o> print(_)
@@ -71,8 +84,20 @@ file_names_in_dir : Strings
 COMMENT
 tasks from file
 
+tasks_from_location(_) : Location => ProgramWith(Tasks)
+  = (inds, p) =>
+    apply(tasks_of_indexes(inds)from_string(_))inside(read_file(p))
+
 tasks_from_file(_) : Path => ProgramWith(Tasks)
   = read_file(_) o> apply(tasks_from_string(_))inside(_)
+
+tasks_of_indexes(_)from_string(_) : ListOf(Int)s x String => Tasks
+  = (is, s) => tasks_from_string(s) -> tasks_of_indexes(is)from(_)
+
+tasks_of_indexes(_)from(_) : ListOf(Int)s x Tasks => Tasks
+  = (?, ts)
+    [] => ts
+    [i, is = ...] => tasks_of_indexes(is)from(elem(i)of(ts).subtasks)
 
 tasks_from_string(_) : String => Tasks
   = split(_)to_lines o> tasks_from_lines(_)
@@ -121,11 +146,29 @@ drop(_)levels_of_indentation_from(_) : Int x String => Possibly(String)
 COMMENT
 manipulating tasks
 
+change_tasks_of_location(_)with(_) : Location x (Tasks => Tasks) => Program
+  = ((tp, p), f(_)) =>
+    tasks_from_file(p) >>
+    change_tasks(_)at(tp)with(f(_)) o> write_tasks(_)to_file(p)
+
 change_tasks_of(_)with(_) : Path x (Tasks => Tasks) => Program
   = (p, f(_)) => tasks_from_file(p) >> f(_) o> write_tasks(_)to_file(p)
 
+change_tasks(_)at(_)with(_) : Tasks x TaskPath x (Tasks => Tasks) => Tasks
+  = (ts, ?, f(_))
+    [] => f(ts)
+    [i, is = ...] =>
+      split(ts)at_index(i-1) -> (before, [t1, after = ...]) =>
+      before + new(t1) + after
+      where
+      new(_) : Task => Task
+        = t1 => (t1.desc, change_tasks(t1.subtasks)at(is)with(f(_)))
+
 COMMENT
 adding tasks
+
+add_str(_)as_task_to_location(_) : String x Location => Program
+  = (s, l) => add_task(str(s)to_task)to_location(l)
 
 add_str(_)as_task_to_file(_) : String x Path => Program
   = (s, p) => add_task(str(s)to_task)to_file(p)
@@ -133,14 +176,28 @@ add_str(_)as_task_to_file(_) : String x Path => Program
 str(_)to_task : String => Task
   = (_, [])
 
+add_task(_)to_location(_) : Task x Location => Program
+  = (t, (tp, p)) => change_tasks_of(p)with(add_task(t)to_tasks(_)at(tp))
+
 add_task(_)to_file(_) : Task x Path => Program
   = (t, p) => append(task(t)to_string)to_file(p)
+
+add_task(_)to_tasks(_)at(_) : Task x Tasks x TaskPath => Tasks
+  = (t, ts, tp) => change_tasks(ts)at(tp)with(_ + t)
 
 COMMENT
 removing tasks
 
+remove_task_at_index(_)in_location(_) : Int x Location => Program
+  = (i, l) =>
+    change_tasks_of_location(l)with(remove_task_of_index(i - 1)from(_))
+
 remove_task_at_index(_)in(_) : Int x Path => Program
   = (i, p) => change_tasks_of(p)with(remove_task_of_index(i - 1)from(_))
+
+remove_task_of_index(_)from(_)at(_) : Int x Tasks x TaskPath => Tasks
+  = (i, ts, tp) =>
+    change_tasks(ts)at(tp)with(remove_task_of_index(i)from(_))
 
 remove_task_of_index(_)from(_) : Int x Tasks => Tasks
   = (i, ts) =>
@@ -154,6 +211,17 @@ remove_and_get_task_of_index(_)from(_) : Int x Path => ProgramWith(Task)
   = (i, p) =>
     tasks_from_file(p) >> remove_and_get_task_of_index(i)from_tasks(_) o>
     (ts, t) => write_tasks(ts)to_file(p); wrap(t)
+
+COMMENT
+inspecting tasks
+
+inspect_task_of_index(_)in(_) : Int x Path => Program
+  = (i, p) =>
+    get_task_of_index(i)of(p) >> t =>
+    print(""); print_tasks(t.subtasks); print("")
+
+get_task_of_index(_)of(_) : Int x Path => ProgramWith(Task)
+  = (i, p) => apply(elem(i)of(_))inside(tasks_from_file(p))
 
 COMMENT
 editing tasks
@@ -221,28 +289,57 @@ print_task(_)with_indetation(_) : Task x Int => Program
     print(i * 2 * ' ' + "- " + t.desc) ;
     print_tasks(t.subtasks)with_indetation(i + 1)
 
-print_top_level_tasks(_) : Tasks => Program
-  = ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc))
+print_tasks(_) : Tasks => Program
+  = ?
+    [] => print("No tasks")
+    ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc))
 
 COMMENT
 action choices and programs
 
+act_choices_general : Strings
+  = ["Add", "Remove", "Inspect", "Edit", "Move"]
+
 act_choices : Strings
-  = ["Add", "Remove", "Edit", "Move", "Move elsewhere"]
+  = act_choices_general + ["Move elsewhere"]
 
 act_progs_for(_) : Path => Programs
-  = p =>
-    apply(_ ; list_tasks)to_all_in(act_progs_for(p)no_list_after) +
-    move_task_from(p)
+  = p => add_and_remove + inspect_task_of(p) + edit_and_move + move_task_from(p)
     where
+    add_and_remove : Programs
+      = list_tasks_after_all_in([add_task_to(p), remove_task_from(p)])
+
+    edit_and_move : Programs
+      = list_tasks_after_all_in([edit_task_of(p), move_task_in(p)])
+
+    list_tasks_after_all_in(_) : Programs => Programs
+      = apply(_ ; list_tasks)to_all_in(_)
+
     list_tasks : Program
       = print(""); list_tasks_of_file(p); print("")
 
-act_progs_for(_)no_list_after : Path => Programs
-  = p => [add_task_to(p), remove_task_from(p), edit_task_of(p), move_task_in(p)]
+add_task_to_location(_) : Location => Program
+  = l =>
+    print("Describe the task")and_get_line >> add_str(_)as_task_to_location(l)
 
 add_task_to(_) : Path => Program
   = p => print("Describe the task")and_get_line >> add_str(_)as_task_to_file(p)
+
+remove_task_from_location(_) : Location => Program
+  = l =>
+    user_int_choice_from_prompt("Remove task by number") >>
+    remove_task_at_index(_)in_location(l)
+
+remove_task_from(_) : Path => Program
+  = p =>
+    user_int_choice_from_prompt("Remove task by number") >>
+    remove_task_at_index(_)in(p)
+
+inspect_task_of(_) : Path => Program
+  = p =>
+    user_task_choice >> i =>
+    inspect_task_of_index(i)in(p) ;
+    choose_action_for_task_of_index(i)in(p)
 
 edit_task_of(_) : Path => Program
   = p =>
@@ -279,11 +376,6 @@ user_task_choice : ProgramWith(Int)
 user_int_choice_from_prompt(_) : String => ProgramWith(Int)
   = s => apply(from_string(_))inside(print(s)and_get_line)
 
-remove_task_from(_) : Path => Program
-  = p =>
-    user_int_choice_from_prompt("Remove task by number") >>
-    remove_task_at_index(_)in(p)
-
 COMMENT
 category choices and programs
 
@@ -298,6 +390,7 @@ list_and_choose_action_for_file(_) : Path => Program
 
 choose_action_for_file(_) : Path => Program
   = p =>
-    say("Choose action by number")and_list_choices_from(act_choices);
+    say("Choose action by number")and_list_choices_from(act_choices) ;
     choose_from(act_progs_for(p))
 
+choose_action_for_task_of_index(_)in(_) : Int x Path => Program
