@@ -32,12 +32,12 @@ TaskPath = ListOf(Int)s
 COMMENT
 main
 
-COMMENT
 main : Program
   = choose_task_category
 
+COMMENT
 main : Program
-  = remove_task_at_index(1)in_location(([2,1], todo_dir + "Projects"))
+  = inspect_task_of_location(([4,1,1], todo_dir + "Projects"))
 
 choose_task_category : Program
   = say(to_say)and_list_choices_from(category_choices) ;
@@ -215,6 +215,21 @@ remove_and_get_task_of_index(_)from(_) : Int x Path => ProgramWith(Task)
 COMMENT
 inspecting tasks
 
+inspect_task_of_location(_) : Location => Program
+  = (tp, p) =>
+    get_task_of_path(tp)in_file(p) >> t =>
+    print(""); print_tasks(t.subtasks); print("")
+
+get_task_of_path(_)in_file(_) : TaskPath x Path => ProgramWith(Task)
+  = (tp, p) =>
+    apply(get_task_of_path(tp)in_tasks(_))inside(tasks_from_file(p))
+
+get_task_of_path(_)in_tasks(_) : TaskPath x Tasks => Task
+  = (?, ts)
+    [i] => elem(i)of(ts)
+    [i, j, rest = ...] =>
+      get_task_of_path(j + rest)in_tasks(elem(i)of(ts).subtasks)
+
 inspect_task_of_index(_)in(_) : Int x Path => Program
   = (i, p) =>
     get_task_of_index(i)of(p) >> t =>
@@ -335,6 +350,15 @@ remove_task_from(_) : Path => Program
     user_int_choice_from_prompt("Remove task by number") >>
     remove_task_at_index(_)in(p)
 
+inspect_task_in_location(_) : Location => Program
+  = (tp, p) =>
+    user_task_choice >> i =>
+      inspect_task_of_location(new_loc) ;
+      choose_action_for_task_of_location(new_loc)
+      where
+      new_loc : Location
+        = (tp + i, p)
+
 inspect_task_of(_) : Path => Program
   = p =>
     user_task_choice >> i =>
@@ -394,3 +418,5 @@ choose_action_for_file(_) : Path => Program
     choose_from(act_progs_for(p))
 
 choose_action_for_task_of_index(_)in(_) : Int x Path => Program
+
+choose_action_for_task_of_location(_) : Location => Program
