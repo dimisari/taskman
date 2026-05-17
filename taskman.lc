@@ -204,11 +204,6 @@ remove_and_get_task_of_index(_)from(_) : Int x Path => ProgramWith(Task)
 COMMENT
 inspecting tasks
 
-inspect_task_of_location(_) : Location => Program
-  = (tp, p) =>
-    get_task_of_path(tp)in_file(p) >> t =>
-    print(""); print_tasks(t.subtasks); print("")
-
 get_task_of_path(_)in_file(_) : TaskPath x Path => ProgramWith(Task)
   = (tp, p) =>
     apply(get_task_of_path(tp)in_tasks(_))inside(tasks_from_file(p))
@@ -333,11 +328,20 @@ remove_task_from_location(_) : Location => Program
 
 inspect_task_in_location(_) : Location => Program
   = (tp, p) =>
-    user_task_choice >> i =>
-      inspect_task_of_location(new_loc) ; choose_action_for_location(new_loc)
-      where
-      new_loc : Location
-        = (tp + i, p)
+    print("Choose action by number or \"b\" for back")and_get_line >> ?
+      "b" => print(""); inspect_back_in_location((tp, p))
+      l =>
+        list_and_choose_action_for_location((tp + i, p))
+        where
+        i : Int
+          = from_string(l)
+
+inspect_back_in_location(_) : Location => Program
+  = (?, p)
+    [] =>
+      print("Not possible to go back (hit beginning)\n") ;
+      list_and_choose_action_for_location(([], p))
+    [i, is = ...] => list_and_choose_action_for_location((is, p))
 
 edit_task_in_location(_) : Location => Program
   = l =>
