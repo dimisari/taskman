@@ -291,14 +291,28 @@ print_tasks(_) : Tasks => Program
     [] => print("No tasks")
     ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc))
 
+print_two_levels_of_tasks(_) : Tasks => Program
+  = ?
+    [] => print("No tasks")
+    ts =>
+      for_all_in(add_one_indexes_to(ts), print_indexed_task(_)and_subtasks)
+      where
+      print_indexed_task(_)and_subtasks : Int x Task => Program
+        = (i, t) =>
+          print_indexed_task((i, t)) ;
+          for_all_in(add_one_indexes_to(t.subtasks), print_indented_indexed(_))
+
+      print_indexed_task(_) : Int x Task => Program
+        = (i, t) => print(i + ". " + t.desc)
+
+      print_indented_indexed(_) : Int x Task => Program
+        = (i, t) => print("  " + i + ". " + t.desc)
+
 COMMENT
 action choices and programs
 
 location_actions : Strings
   = ["Add", "Remove", "Inspect", "Edit", "Move"]
-
-file_actions : Strings
-  = location_actions + ["Move elsewhere"]
 
 act_progs_for_location(_) : Location => Programs
   = l =>
@@ -391,17 +405,22 @@ list_and_choose_action_for_location(_) : Location => Program
   = l => list_tasks_of_location(l) ; choose_action_for_location(l)
 
 list_and_choose_action_for_file(_) : Path => Program
-  = p => list_tasks_of_location(([], p)) ; choose_action_for_file(p)
+  = p => list_tasks_of_location(([], p)) ; choose_action_for_location(([], p))
 
 list_tasks_of_location(_) : Location => Program
-  = tasks_from_location(_) o> (_ >> print_tasks(_))
+  = tasks_from_location(_) o> (_ >> print_two_levels_of_tasks(_))
 
 choose_action_for_location(_) : Location => Program
   = l =>
-    say("Choose action by number")and_list_choices_from(location_actions) ;
-    choose_from(act_progs_for_location(l))
+    say("Choose action by number")and_list_choices_from(actions) ;
+    choose_from(progs)
+    where
+    actions : Strings
+      = location_actions + l -> ?
+        ([], *) => ["Move elsewhere"]
+        ... => []
 
-choose_action_for_file(_) : Path => Program
-  = p =>
-    say("Choose action by number")and_list_choices_from(file_actions) ;
-    choose_from(act_progs_for_location(([], p)) + move_task_from(p))
+    progs : Programs
+      = act_progs_for_location(l) + l -> ?
+        ([], p) => [move_task_from(p)]
+        ... => []
