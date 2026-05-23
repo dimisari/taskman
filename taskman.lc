@@ -353,7 +353,7 @@ inspect_task_in_location(_) : Location => Program
 inspect_back_in_location(_) : Location => Program
   = (?, p)
     [] =>
-      print("Not possible to go back (hit beginning)\n") ;
+      print("Not possible to go back (hit beginning)\n");
       list_and_choose_action_for_location(([], p))
     [i, is = ...] => list_and_choose_action_for_location((is, p))
 
@@ -372,7 +372,7 @@ move_task_in_location(_) : Location => Program
 move_task_from(_) : Path => Program
   = p =>
     user_task_choice >> i =>
-    say(to_say)and_list_choices_from(category_choices) ;
+    say(to_say)and_list_choices_from(category_choices);
     choose_from(move_task_by_index(i)from(p)programs)
     where
     to_say : String
@@ -383,8 +383,8 @@ move_task_by_index(_)from(_)programs : Int x Path => Programs
 
 move_task_by_index(_)from(_)to(_) : Int x Path x Path => Program
   = (i, from_p, to_p) =>
-    remove_and_get_task_of_index(i-1)from(from_p) >> add_task(_)to_file(to_p) ;
-    choose_task_category
+    remove_and_get_task_of_index(i - 1)from(from_p) >> add_task(_)to_file(to_p);
+    list_and_choose_action_for_file(to_p)
 
 user_task_choice : ProgramWith(Int)
   = user_int_choice_from_prompt("Choose task by number")
@@ -405,7 +405,7 @@ list_and_choose_action_for_location(_) : Location => Program
   = l => list_tasks_of_location(l) ; choose_action_for_location(l)
 
 list_and_choose_action_for_file(_) : Path => Program
-  = p => list_tasks_of_location(([], p)) ; choose_action_for_location(([], p))
+  = p => list_and_choose_action_for_location(([], p))
 
 list_tasks_of_location(_) : Location => Program
   = tasks_from_location(_) o> (_ >> print_two_levels_of_tasks(_))
