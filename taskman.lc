@@ -33,7 +33,9 @@ COMMENT
 main
 
 main : Program
-  = choose_task_category
+  = does_file(".tasks")exist >> ?
+    true => print(""); list_and_choose_action_for_file(".tasks")
+    false => choose_task_category
 
 choose_task_category : Program
   = say(to_say)and_list_choices_from(category_choices) ;
@@ -415,12 +417,10 @@ choose_action_for_location(_) : Location => Program
     say("Choose action by number")and_list_choices_from(actions) ;
     choose_from(progs)
     where
-    actions : Strings
-      = location_actions + l -> ?
-        ([], *) => ["Move elsewhere"]
-        ... => []
+    (la, apfl) : Strings x Programs
+      = (location_actions, act_progs_for_location(l))
 
-    progs : Programs
-      = act_progs_for_location(l) + l -> ?
-        ([], p) => [move_task_from(p)]
-        ... => []
+    (actions, progs) : Strings x Programs
+      = l -> ?
+        ([], p) => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
+        ... => (la, apfl)
