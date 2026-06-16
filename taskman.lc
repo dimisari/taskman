@@ -33,16 +33,33 @@ COMMENT
 main
 
 main : Program
-  = does_file(".tasks")exist >> ?
-    true => print(""); list_and_choose_action_for_file(".tasks")
-    false => choose_task_category
+  = does_directory(".tasks")exist >> ?
+    true => choose_from_dot_tasks
+    false =>
+      does_file(".tasks")exist >> ?
+        true => print(""); list_and_choose_action_for_file(".tasks")
+        false =>
+          choose_task_category(file_names_in_dir, programs_from(file_list))
 
-choose_task_category : Program
-  = say(to_say)and_list_choices_from(category_choices) ;
-    choose_from(category_programs)
+dot_tasks_choices_and_programs : ProgramWith(Strings x Programs)
+  = list_directory(".tasks") >> file_names =>
+      wrap((file_names, programs))
+      where
+      programs : Programs
+        = programs_from(file_list_from_dir(".tasks/")and_files(file_names))
+
+choose_from_dot_tasks : Program
+  = dot_tasks_choices_and_programs >> choose_task_category(_, _)
+
+choose_task_category(_, _) : Strings x Programs => Program
+  = (choices, programs) => say(to_say)list(choices)and_choose_from(programs)
     where
     to_say : String
       = "Choose task category to show by number"
+
+say(_)list(_)and_choose_from(_) : String x Strings x Programs => Program
+  = (to_say, choices, programs) =>
+    say(to_say)and_list_choices_from(choices) ; choose_from(programs)
 
 choose_from(_) : Programs => Program
   = programs =>
@@ -70,8 +87,11 @@ paths
 todo_dir : Path
   = "/home/gnostis/.local/share/Todo/"
 
+file_list_from_dir(_)and_files(_) : Path x Strings => ListOf(Path)s
+  = (p, ss) => apply(p + _)to_all_in(ss)
+
 file_list : ListOf(Path)s
-  = apply(todo_dir + _)to_all_in(file_names_in_dir)
+  = file_list_from_dir(todo_dir)and_files(file_names_in_dir)
 
 file_names_in_dir : Strings
   = ["Next", "Schedule", "Waiting", "Projects", "Later"]
@@ -374,11 +394,13 @@ move_task_in_location(_) : Location => Program
 move_task_from(_) : Path => Program
   = p =>
     user_task_choice >> i =>
-    say(to_say)and_list_choices_from(category_choices);
-    choose_from(move_task_by_index(i)from(p)programs)
-    where
-    to_say : String
-      = "Choose task category to move to by number"
+      say(to_say)list(file_names_in_dir)and_choose_from(programs)
+      where
+      to_say : String
+        = "Choose task category to move to by number"
+
+      programs : Programs
+        = move_task_by_index(i)from(p)programs
 
 move_task_by_index(_)from(_)programs : Int x Path => Programs
   = (i, p) => apply(move_task_by_index(i)from(p)to(_))to_all_in(file_list)
@@ -397,11 +419,8 @@ user_int_choice_from_prompt(_) : String => ProgramWith(Int)
 COMMENT
 category choices and programs
 
-category_choices : Strings
-  = file_names_in_dir
-
-category_programs : Programs
-  = apply(list_and_choose_action_for_file(_))to_all_in(file_list)
+programs_from(_) : ListOf(Path)s => Programs
+  = apply(list_and_choose_action_for_file(_))to_all_in(_)
 
 list_and_choose_action_for_location(_) : Location => Program
   = l => list_tasks_of_location(l) ; choose_action_for_location(l)
@@ -414,8 +433,7 @@ list_tasks_of_location(_) : Location => Program
 
 choose_action_for_location(_) : Location => Program
   = l =>
-    say("Choose action by number")and_list_choices_from(actions) ;
-    choose_from(progs)
+    say("Choose action by number")list(actions)and_choose_from(progs)
     where
     (la, apfl) : Strings x Programs
       = (location_actions, act_progs_for_location(l))
