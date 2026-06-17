@@ -436,5 +436,8 @@ choose_action_for_location(_) : Location => Program
 
     (actions, progs) : Strings x Programs
       = l -> ?
-        ([], p) => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
+        ([], p) =>
+          (get_file_name_of(p) != ".tasks") -> ?
+            true => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
+            fasle => (la, apfl)
         ... => (la, apfl)
