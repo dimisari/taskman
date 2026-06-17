@@ -12,6 +12,9 @@ TYPE NICKNAME
 Path = String
 
 TYPE NICKNAME
+Paths = ListOf(Path)s
+
+TYPE NICKNAME
 Line = String
 
 TYPE NICKNAME
@@ -34,22 +37,23 @@ main
 
 main : Program
   = does_directory(".tasks")exist >> ?
-    true => choose_from_dot_tasks
+    true => choose_from_directory(".tasks")
     false =>
       does_file(".tasks")exist >> ?
         true => print(""); list_and_choose_action_for_file(".tasks")
-        false =>
-          choose_task_category(file_names_in_dir, programs_from(file_list))
+        false => choose_from_directory(todo_dir)
 
-dot_tasks_choices_and_programs : ProgramWith(Strings x Programs)
-  = list_directory(".tasks") >> file_names =>
-      wrap((file_names, programs))
-      where
-      programs : Programs
-        = programs_from(file_list_from_dir(".tasks/")and_files(file_names))
+choices_and_programs_from_dir(_) : Path => ProgramWith(Strings x Programs)
+  = choices_and_paths_from_dir(_) o>
+    (_ >> (cs, ps) => wrap((cs, programs_from(ps))))
 
-choose_from_dot_tasks : Program
-  = dot_tasks_choices_and_programs >> choose_task_category(_, _)
+choices_and_paths_from_dir(_) : Path => ProgramWith(Strings x Paths)
+  = p =>
+    list_directory(p) >> file_names =>
+    wrap((file_names, paths_from_dir(p)and_files(file_names)))
+
+choose_from_directory(_) : Path => Program
+  = choices_and_programs_from_dir(_) o> (_ >> choose_task_category(_, _))
 
 choose_task_category(_, _) : Strings x Programs => Program
   = (choices, programs) => say(to_say)list(choices)and_choose_from(programs)
@@ -85,16 +89,10 @@ COMMENT
 paths
 
 todo_dir : Path
-  = "/home/gnostis/.local/share/Todo/"
+  = "/home/gnostis/.local/share/Todo/todo"
 
-file_list_from_dir(_)and_files(_) : Path x Strings => ListOf(Path)s
-  = (p, ss) => apply(p + _)to_all_in(ss)
-
-file_list : ListOf(Path)s
-  = file_list_from_dir(todo_dir)and_files(file_names_in_dir)
-
-file_names_in_dir : Strings
-  = ["Next", "Schedule", "Waiting", "Projects", "Later"]
+paths_from_dir(_)and_files(_) : Path x Strings => ListOf(Path)s
+  = (p, ss) => apply(p + "/" + _)to_all_in(ss)
 
 COMMENT
 tasks from file
@@ -394,16 +392,14 @@ move_task_in_location(_) : Location => Program
 move_task_from(_) : Path => Program
   = p =>
     user_task_choice >> i =>
-      say(to_say)list(file_names_in_dir)and_choose_from(programs)
+    choices_and_paths_from_dir(get_directory_of(p)) >> (cs, ps) =>
+      say(to_say)list(cs)and_choose_from(programs)
       where
       to_say : String
         = "Choose task category to move to by number"
 
       programs : Programs
-        = move_task_by_index(i)from(p)programs
-
-move_task_by_index(_)from(_)programs : Int x Path => Programs
-  = (i, p) => apply(move_task_by_index(i)from(p)to(_))to_all_in(file_list)
+        = apply(move_task_by_index(i)from(p)to(_))to_all_in(ps)
 
 move_task_by_index(_)from(_)to(_) : Int x Path x Path => Program
   = (i, from_p, to_p) =>
