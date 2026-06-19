@@ -49,7 +49,7 @@ choices_and_programs_from_dir(_) : Path => ProgramWith(Strings x Programs)
 
 choices_and_paths_from_dir(_) : Path => ProgramWith(Strings x Paths)
   = p =>
-    list_directory(p) >> file_names =>
+    file_names_from_dir(p) >> file_names =>
     wrap((file_names, paths_from_dir(p)and_files(file_names)))
 
 choose_from_directory(_) : Path => Program
@@ -94,26 +94,29 @@ todo_dir : Path
 paths_from_dir(_)and_files(_) : Path x Strings => ListOf(Path)s
   = (p, ss) => apply(p + "/" + _)to_all_in(ss)
 
+file_names_from_dir(_) : Path => ProgramWith(Strings)
+  = (_ + "/.order") o> read_file(_)into_lines
+
 COMMENT
 tasks from file
 
 tasks_from_location(_) : Location => ProgramWith(Tasks)
   = (inds, p) =>
-    apply(tasks_of_indexes(inds)from_string(_))inside(read_file(p))
+    apply(tasks_of_indexes(inds)from_lines(_))inside(read_file(p)into_lines)
 
 tasks_from_file(_) : Path => ProgramWith(Tasks)
-  = read_file(_) o> apply(tasks_from_string(_))inside(_)
+  = read_file(_)into_lines o> apply(tasks_from_lines(_))inside(_)
 
-tasks_of_indexes(_)from_string(_) : ListOf(Int)s x String => Tasks
-  = (is, s) => tasks_from_string(s) -> tasks_of_indexes(is)from(_)
+read_file(_)into_lines : Path => ProgramWith(Strings)
+  = read_file(_) o> apply(split(_)to_lines)inside(_)
+
+tasks_of_indexes(_)from_lines(_) : ListOf(Int)s x Strings => Tasks
+  = (is, ls) => tasks_from_lines(ls) -> tasks_of_indexes(is)from(_)
 
 tasks_of_indexes(_)from(_) : ListOf(Int)s x Tasks => Tasks
   = (?, ts)
     [] => ts
     [i, is = ...] => tasks_of_indexes(is)from(elem(i)of(ts).subtasks)
-
-tasks_from_string(_) : String => Tasks
-  = split(_)to_lines o> tasks_from_lines(_)
 
 tasks_from_lines(_) : Lines => Tasks
   = tasks_of_level(0)from_lines(_) o> ?
