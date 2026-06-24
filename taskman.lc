@@ -21,9 +21,6 @@ TYPE NICKNAME
 Lines = ListOf(Line)s
 
 TYPE NICKNAME
-Strings = ListOf(String)s
-
-TYPE NICKNAME
 Programs = ListOf(Program)s
 
 TYPE NICKNAME
@@ -36,12 +33,48 @@ COMMENT
 main
 
 main : Program
-  = does_directory(".tasks")exist >> ?
-    true => choose_from_directory(".tasks")
-    false =>
-      does_file(".tasks")exist >> ?
-        true => print(""); list_and_choose_action_for_file(".tasks")
-        false => choose_from_directory(todo_dir)
+  = get_arguments >> ?
+    ["new"] => add_tasks_file_if_it_does_not_exist
+    [] => check_tasks_exist_and_do
+    other => print("unexpected arguments: " + other)
+
+add_tasks_file_if_it_does_not_exist : Program
+  = (print(dir_exists_msg), print(file_exists_msg), add_tasks_file) ->
+    check_tasks_exist_and_do_general(_, _, _)
+    where
+    dir_exists_msg : String
+      = "\".tasks\" directory exists"
+
+    file_exists_msg : String
+      = "\".tasks\" file exists"
+
+    add_tasks_file : Program
+      = write("")to_file(".tasks")
+
+check_tasks_exist_and_do_general(_, _, _) : Program^3 => Program
+  = (print_true_dir_msg, print_true_file_msg, does_not_exist_prog) =>
+    does_tasks_directory_exist >> ?
+      true => print_true_dir_msg; choose_from_directory(".tasks")
+      false =>
+        check_tasks_file_and_do_general(print_true_file_msg, does_not_exist_prog)
+
+check_tasks_exist_and_do : Program
+  = (do_nothing, do_nothing, choose_from_directory(todo_dir)) ->
+    check_tasks_exist_and_do_general(_, _, _)
+
+check_tasks_file_and_do_general(_, _) : Program^2 => Program
+  = (print_true_file_msg, does_not_exist_prog) =>
+    does_tasks_file_exist >> ?
+      true =>
+        print_true_file_msg; print("");
+        list_and_choose_action_for_file(".tasks")
+      false => does_not_exist_prog
+
+does_tasks_file_exist : ProgramWith(Bool)
+  = does_file(".tasks")exist
+
+does_tasks_directory_exist : ProgramWith(Bool)
+  = does_directory(".tasks")exist
 
 choices_and_programs_from_dir(_) : Path => ProgramWith(Strings x Programs)
   = choices_and_paths_from_dir(_) o>
@@ -69,7 +102,11 @@ choose_from(_) : Programs => Program
   = programs =>
     get_line >> ?
       "" => do_nothing
-      l => print(""); from_string(l) -> elem(_)of(programs)
+      l =>
+        if_string(l)is_int_do(make_choice)else(choose_from(programs))
+        where
+        make_choice : Int => Program
+          = i => print(""); elem(i)of(programs)
 
 COMMENT
 say and list choices
@@ -368,10 +405,13 @@ inspect_task_in_location(_) : Location => Program
     print("Choose action by number or \"b\" for back")and_get_line >> ?
       "b" => print(""); inspect_back_in_location((tp, p))
       l =>
-        list_and_choose_action_for_location((tp + i, p))
+        if_string(l)is_int_do(choose_for_new(_))else(choose_for_same)
         where
-        i : Int
-          = from_string(l)
+        choose_for_new(_) : Int => Program
+          = i => list_and_choose_action_for_location((tp + i, p))
+
+        choose_for_same : Program
+          = inspect_task_in_location((tp, p))
 
 inspect_back_in_location(_) : Location => Program
   = (?, p)
@@ -413,7 +453,16 @@ user_task_choice : ProgramWith(Int)
   = user_int_choice_from_prompt("Choose task by number")
 
 user_int_choice_from_prompt(_) : String => ProgramWith(Int)
-  = s => apply(from_string(_))inside(print(s)and_get_line)
+  = s =>
+    print(s)and_get_line >>
+    if_string(_)is_int_do(wrap(_))else(user_int_choice_from_prompt(s))
+
+if_string(_)is_int_do(_)else(_)
+  : String x (Int => ProgramWith(T1)) x ProgramWith(T1) => ProgramWith(T1)
+  = (s, f(_), p) =>
+    from_string(s) -> ?
+      a_value => f(the_value)
+      no_value => print("\""+ s + "\" is not an integer\n"); p
 
 COMMENT
 category choices and programs
