@@ -389,7 +389,7 @@ act_progs_for_location(_) : Location => Programs
       = apply(_ ; list_and_choose)to_all_in(_)
 
     list_and_choose : Program
-      = print(""); list_and_choose_action_for_location(l); print("")
+      = print(""); list_and_choose_action_for_location(l)
 
 add_task_to_location(_) : Location => Program
   = l =>
