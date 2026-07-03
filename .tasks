@@ -1,4 +1,5 @@
 - Adding and deleting categories
-- check all the split at index and add catching functions for when expected pattern does not match because if it breaks it deletes all the tasks
+- check all the split at index and add catching functions for when expected pattern does not match because if it breaks it deletes all the task
   - pasted something from the terminal after "New Description" and it broke
   - It included a newline (that's probably the reason)
+  - Unable to recreate the issue

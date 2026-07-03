@@ -141,6 +141,10 @@ tasks_from_location(_) : Location => ProgramWith(Tasks)
   = (inds, p) =>
     apply(tasks_of_indexes(inds)from_lines(_))inside(read_file(p)into_lines)
 
+task_from_location(_) : Location => ProgramWith(Task)
+  = (inds, p) =>
+    apply(task_of_indexes(inds)from_lines(_))inside(read_file(p)into_lines)
+
 tasks_from_file(_) : Path => ProgramWith(Tasks)
   = read_file(_)into_lines o> apply(tasks_from_lines(_))inside(_)
 
@@ -154,6 +158,15 @@ tasks_of_indexes(_)from(_) : ListOf(Int)s x Tasks => Tasks
   = (?, ts)
     [] => ts
     [i, is = ...] => tasks_of_indexes(is)from(elem(i)of(ts).subtasks)
+
+task_of_indexes(_)from_lines(_) : ListOf(Int)s x Strings => Task
+  = (is, ls) => tasks_from_lines(ls) -> task_of_indexes(is)from(_)
+
+task_of_indexes(_)from(_) : ListOf(Int)s x Tasks => Task
+  = (?, ts)
+    [] => error("Trying to get task with no index")
+    [i] => elem(i)of(ts)
+    [i, is = ...] => task_of_indexes(is)from(elem(i)of(ts).subtasks)
 
 tasks_from_lines(_) : Lines => Tasks
   = tasks_of_level(0)from_lines(_) o> ?
@@ -368,6 +381,12 @@ print_two_levels_of_tasks(_) : Tasks => Program
       print_indented_indexed(_) : Int x Task => Program
         = (i, t) => print("  " + i + ". " + t.desc)
 
+print_task(_) : Task => Program
+  = _.desc o> ("\n" + _ + "\n") o> print(_)
+
+print_task_of_location(_) : Location => Program
+  = task_from_location(_) o> (_ >> print_task(_))
+
 COMMENT
 action choices and programs
 
@@ -408,7 +427,12 @@ inspect_task_in_location(_) : Location => Program
         if_string(l)is_int_do(choose_for_new(_))else(choose_for_same)
         where
         choose_for_new(_) : Int => Program
-          = i => list_and_choose_action_for_location((tp + i, p))
+          = i =>
+            print_task_of_location(new_loc);
+            list_and_choose_action_for_location(new_loc)
+            where
+            new_loc : Location
+              = (tp + i, p)
 
         choose_for_same : Program
           = inspect_task_in_location((tp, p))
