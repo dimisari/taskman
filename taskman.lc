@@ -3,7 +3,7 @@ types
 
 TUPLE TYPE
 Task = String x Tasks
-(desc, subtasks)
+(tdesc, subtasks)
 
 TYPE NICKNAME
 Tasks = ListOf(Task)s
@@ -28,6 +28,10 @@ Location = TaskPath x Path
 
 TYPE NICKNAME
 TaskPath = ListOf(Int)s
+
+TUPLE TYPE
+Action = String x String x Program
+(adesc, ainput, aprog)
 
 COMMENT
 main
@@ -96,7 +100,7 @@ choose_task_category(_, _) : Strings x Programs => Program
 
 say(_)list(_)and_choose_from(_) : String x Strings x Programs => Program
   = (to_say, choices, programs) =>
-    say(to_say)and_list_choices_from(choices) ; choose_from(programs)
+    say(to_say)and_list_choices(choices) ; choose_from(programs)
 
 choose_from(_) : Programs => Program
   = programs =>
@@ -111,16 +115,17 @@ choose_from(_) : Programs => Program
 COMMENT
 say and list choices
 
-say(_)and_list_choices_from(_) : String x Strings => Program
-  = (to_say, choices) => print("\n" + to_say) ; list_choices_from_list(choices)
+say(_)and_list_choices(_) : String x Strings => Program
+  = (to_say, choices) => print("\n" + to_say) ; list_choices(choices)
 
-list_choices_from_list(_) : Strings => Program
-  = choices_from_list(_)to_string o> print(_)
+list_choices(_) : Strings => Program
+  = choices(_)to_string o> print(_)
 
-choices_from_list(_)to_string : Strings => String
-  = add_one_indexes_to(_) o>
-    apply((i, s) => i + ". " + s + "  ")to_all_in(_) o>
-    concat_lists(_) o> (_ + "(Enter to quit)" )
+add_numbers_to_choices(_) : Strings => Strings
+  = add_one_indexes_to(_) o> apply((i, s) => i + ". " + s + "  ")to_all_in(_)
+
+choices(_)to_string : Strings => String
+  = add_numbers_to_choices(_) o> concat_lists(_) o> (_ + "(Enter to quit)" )
 
 COMMENT
 paths
@@ -228,7 +233,7 @@ change_tasks(_)at(_)with(_) : Tasks x TaskPath x (Tasks => Tasks) => Tasks
       before + new(t1) + after
       where
       new(_) : Task => Task
-        = t1 => (t1.desc, change_tasks(t1.subtasks)at(is)with(f(_)))
+        = t1 => (t1.tdesc, change_tasks(t1.subtasks)at(is)with(f(_)))
 
 COMMENT
 adding tasks
@@ -342,7 +347,7 @@ tasks(_)with_indetation(_)to_string : Tasks x Int => String
 
 task(_)with_indetation(_)to_string : Task x Int => String
   = (t, i) =>
-    i * 2 * ' ' + "- " + t.desc + "\n" +
+    i * 2 * ' ' + "- " + t.tdesc + "\n" +
     tasks(t.subtasks)with_indetation(i + 1)to_string
 
 task(_)to_string : Task => String
@@ -356,13 +361,13 @@ print_tasks(_)with_indetation(_) : Tasks x Int => Program
 
 print_task(_)with_indetation(_) : Task x Int => Program
   = (t, i) =>
-    print(i * 2 * ' ' + "- " + t.desc) ;
+    print(i * 2 * ' ' + "- " + t.tdesc) ;
     print_tasks(t.subtasks)with_indetation(i + 1)
 
 print_tasks(_) : Tasks => Program
   = ?
     [] => print("No tasks")
-    ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.desc))
+    ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.tdesc))
 
 print_two_levels_of_tasks(_) : Tasks => Program
   = ?
@@ -376,13 +381,13 @@ print_two_levels_of_tasks(_) : Tasks => Program
           for_all_in(add_one_indexes_to(t.subtasks), print_indented_indexed(_))
 
       print_indexed_task(_) : Int x Task => Program
-        = (i, t) => print(i + ". " + t.desc)
+        = (i, t) => print(i + ". " + t.tdesc)
 
       print_indented_indexed(_) : Int x Task => Program
-        = (i, t) => print("  " + i + ". " + t.desc)
+        = (i, t) => print("  " + i + ". " + t.tdesc)
 
 print_task(_) : Task => Program
-  = _.desc o> ("\n" + _ + "\n") o> print(_)
+  = _.tdesc o> ("\n" + _ + "\n") o> print(_)
 
 print_task_of_location(_) : Location => Program
   = task_from_location(_) o> (_ >> print_task(_))
@@ -421,7 +426,7 @@ remove_task_from_location(_) : Location => Program
 
 inspect_task_in_location(_) : Location => Program
   = (tp, p) =>
-    print("Choose action by number or \"b\" for back")and_get_line >> ?
+    print("Choose task by number or \"b\" for back")and_get_line >> ?
       "b" => print(""); inspect_back_in_location((tp, p))
       l =>
         if_string(l)is_int_do(choose_for_new(_))else(choose_for_same)

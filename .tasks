@@ -1,5 +1,10 @@
+- When in the choose action menu add "b" to go back to categories
+  - make actions general strings and put together the numbered and the specific ones
 - Adding and deleting categories
 - check all the split at index and add catching functions for when expected pattern does not match because if it breaks it deletes all the task
   - pasted something from the terminal after "New Description" and it broke
   - It included a newline (that's probably the reason)
   - Unable to recreate the issue
+- Add the ability to move around with arrows in the description of a task
+- When editing give the old description (needs 4)
+- Split big tasks at character 80
