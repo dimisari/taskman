@@ -1,3 +1,4 @@
+- Ability to make a task a child task of a sibling task
 - When in the choose action menu add "b" to go back to categories
   - make actions general strings and put together the numbered and the specific ones
 - Adding and deleting categories
@@ -8,3 +9,8 @@
 - Add the ability to move around with arrows in the description of a task
 - When editing give the old description (needs 4)
 - Split big tasks at character 80
+- When inspecting the task show the parent task after adding
+  - In other words keep showing the parent task after doing actions during inspection
+- Only show the first 5 tasks
+  - Add a mechanism to scroll to bigger number tasks if needed
+- When changing your mind after an action is chosen add ability to go back instead of having to ctrl+c

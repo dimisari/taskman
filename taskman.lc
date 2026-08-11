@@ -33,6 +33,13 @@ TUPLE TYPE
 Action = String x String x Program
 (adesc, ainput, aprog)
 
+TYPE NICKNAME
+Actions = ListOf(Action)s
+
+OR TYPE
+StringMatchesAction
+matches--<match_prog : Program> | does_not_match
+
 COMMENT
 main
 
@@ -102,15 +109,63 @@ say(_)list(_)and_choose_from(_) : String x Strings x Programs => Program
   = (to_say, choices, programs) =>
     say(to_say)and_list_choices(choices) ; choose_from(programs)
 
+say(_)and_show_choices(_) : String x Actions => Program
+  = (to_say, choices) => print("\n" + to_say); show_choices(choices)
+
 choose_from(_) : Programs => Program
   = programs =>
     get_line >> ?
       "" => do_nothing
       l =>
-        if_string(l)is_int_do(make_choice)else(choose_from(programs))
+        if_string(l)is_int_do(choose_program(_))else(choose_from(programs))
         where
-        make_choice : Int => Program
-          = i => print(""); elem(i)of(programs)
+        choose_program(_) : Int => Program
+          = i =>
+            print("") ;
+            elem(i)of(programs) -> ?
+              no_value => print(i + " is invalid") ; choose_from(programs)
+              a_value => the_value
+
+COMMENT
+show choices using the Action type
+
+show_choices(_) : Actions => Program
+  = as =>
+    print(menu_from_actions(as)) ; get_line >> l =>
+    run_choice(l)from_actions(as)
+
+menu_from_actions(_) : Actions => String
+  = apply(menu_string_from_action(_))to_all_in(_) o> delimit(_)with("  ")
+
+menu_string_from_action(_) : Action => String
+  = a => a.ainput + ". " + a.adesc
+
+run_choice(_)from_actions(_) : String x Actions => Program
+  = (s, ?)
+    [] => print("There is no choice: " + s)
+    [a, as = ...] =>
+      check_choice(s)against_action(a) -> ?
+        matches => match_prog
+        does_not_match => run_choice(s)from_actions(as)
+
+check_choice(_)against_action(_) : String x Action => StringMatchesAction
+  = (s, a) =>
+    (s == a.ainput) -> ?
+      true => matches--a.aprog
+      false => does_not_match
+
+actions_from_strings(_)and_programs(_) : Strings x Programs => Actions
+  = actions_from_strings(_)and_programs(_)starting_at(1)
+
+actions_from_strings(_)and_programs(_)starting_at(_)
+  : Strings x Programs x Int => Actions
+  = (?, ?, i)
+    ([],[]) => []
+    ([s, ss = ...], [p, ps = ...]) =>
+      action + actions_from_strings(ss)and_programs(ps)starting_at(i + 1)
+      where
+      action : Action
+        = (s, (i)to_string, p)
 
 COMMENT
 say and list choices
@@ -143,12 +198,12 @@ COMMENT
 tasks from file
 
 tasks_from_location(_) : Location => ProgramWith(Tasks)
-  = (inds, p) =>
-    apply(tasks_of_indexes(inds)from_lines(_))inside(read_file(p)into_lines)
+  = (tp, p) =>
+    apply(tasks_of_path(tp)from_lines(_))inside(read_file(p)into_lines)
 
 task_from_location(_) : Location => ProgramWith(Task)
-  = (inds, p) =>
-    apply(task_of_indexes(inds)from_lines(_))inside(read_file(p)into_lines)
+  = (tp, p) =>
+    apply(task_of_path(tp)from_lines(_))inside(read_file(p)into_lines)
 
 tasks_from_file(_) : Path => ProgramWith(Tasks)
   = read_file(_)into_lines o> apply(tasks_from_lines(_))inside(_)
@@ -156,22 +211,22 @@ tasks_from_file(_) : Path => ProgramWith(Tasks)
 read_file(_)into_lines : Path => ProgramWith(Strings)
   = read_file(_) o> apply(split(_)to_lines)inside(_)
 
-tasks_of_indexes(_)from_lines(_) : ListOf(Int)s x Strings => Tasks
-  = (is, ls) => tasks_from_lines(ls) -> tasks_of_indexes(is)from(_)
+tasks_of_path(_)from_lines(_) : TaskPath x Strings => Tasks
+  = (is, ls) => tasks_from_lines(ls) -> tasks_of_path(is)from(_)
 
-tasks_of_indexes(_)from(_) : ListOf(Int)s x Tasks => Tasks
+tasks_of_path(_)from(_) : TaskPath x Tasks => Tasks
   = (?, ts)
     [] => ts
-    [i, is = ...] => tasks_of_indexes(is)from(elem(i)of(ts).subtasks)
+    [i, is = ...] => tasks_of_path(is)from(task(i)of(ts).subtasks)
 
-task_of_indexes(_)from_lines(_) : ListOf(Int)s x Strings => Task
-  = (is, ls) => tasks_from_lines(ls) -> task_of_indexes(is)from(_)
+task_of_path(_)from_lines(_) : TaskPath x Strings => Task
+  = (is, ls) => tasks_from_lines(ls) -> task_of_path(is)from(_)
 
-task_of_indexes(_)from(_) : ListOf(Int)s x Tasks => Task
+task_of_path(_)from(_) : TaskPath x Tasks => Task
   = (?, ts)
     [] => error("Trying to get task with no index")
-    [i] => elem(i)of(ts)
-    [i, is = ...] => task_of_indexes(is)from(elem(i)of(ts).subtasks)
+    [i] => task(i)of(ts)
+    [i, is = ...] => task_of_path(is)from(task(i)of(ts).subtasks)
 
 tasks_from_lines(_) : Lines => Tasks
   = tasks_of_level(0)from_lines(_) o> ?
@@ -214,6 +269,10 @@ drop(_)levels_of_indentation_from(_) : Int x String => Possibly(String)
     (i, [' ', ' ', s = ...]) => drop(i - 1)levels_of_indentation_from(s)
     (i, s) => no_value
 
+IMPLEMENTATION
+(Task)Has_String_Representation
+(_)to_string = t => t.tdesc + "\n" + (t.subtasks)to_string
+
 COMMENT
 manipulating tasks
 
@@ -229,7 +288,7 @@ change_tasks(_)at(_)with(_) : Tasks x TaskPath x (Tasks => Tasks) => Tasks
   = (ts, ?, f(_))
     [] => f(ts)
     [i, is = ...] =>
-      split(ts)at_index(i-1) -> (before, [t1, after = ...]) =>
+      split(ts)at_index(i - 1) -> (before, [t1, after = ...]) =>
       before + new(t1) + after
       where
       new(_) : Task => Task
@@ -257,22 +316,22 @@ COMMENT
 removing tasks
 
 remove_task_at_index(_)in_location(_) : Int x Location => Program
-  = (i, l) => change_tasks_of_location(l)with(remove_task_of_index(i - 1)from(_))
+  = (i, l) => change_tasks_of_location(l)with(remove_task_of_index(i)from(_))
 
 remove_task_at_index(_)in(_) : Int x Path => Program
-  = (i, p) => change_tasks_of(p)with(remove_task_of_index(i - 1)from(_))
+  = (i, p) => change_tasks_of(p)with(remove_task_of_index(i)from(_))
 
 remove_task_of_index(_)from(_)at(_) : Int x Tasks x TaskPath => Tasks
   = (i, ts, tp) =>
-    change_tasks(ts)at(tp)with(remove_task_of_index(i - 1)from(_))
+    change_tasks(ts)at(tp)with(remove_task_of_index(i)from(_))
 
 remove_task_of_index(_)from(_) : Int x Tasks => Tasks
   = (i, ts) =>
-    split(ts)at_index(i) -> (before, [*, after = ...]) => before + after
+    split(ts)at_index(i - 1) -> (before, [*, after = ...]) => before + after
 
 remove_and_get_task_of_index(_)from_tasks(_) : Int x Tasks => Tasks x Task
   = (i, ts) =>
-    split(ts)at_index(i) -> (before, [t, after = ...]) => (before + after, t)
+    split(ts)at_index(i - 1) -> (before, [t, after = ...]) => (before + after, t)
 
 remove_and_get_task_of_index(_)from(_) : Int x Path => ProgramWith(Task)
   = (i, p) =>
@@ -282,18 +341,14 @@ remove_and_get_task_of_index(_)from(_) : Int x Path => ProgramWith(Task)
 COMMENT
 inspecting tasks
 
-get_task_of_path(_)in_file(_) : TaskPath x Path => ProgramWith(Task)
-  = (tp, p) =>
-    apply(get_task_of_path(tp)in_tasks(_))inside(tasks_from_file(p))
-
-get_task_of_path(_)in_tasks(_) : TaskPath x Tasks => Task
-  = (?, ts)
-    [i] => elem(i)of(ts)
-    [i, j, rest = ...] =>
-      get_task_of_path(j + rest)in_tasks(elem(i)of(ts).subtasks)
-
 get_task_of_index(_)of(_) : Int x Path => ProgramWith(Task)
-  = (i, p) => apply(elem(i)of(_))inside(tasks_from_file(p))
+  = (i, p) => apply(task(i)of(_))inside(tasks_from_file(p))
+
+task(_)of(_) : Int x Tasks => Task
+  = (i, ts) =>
+    elem(i)of(ts) -> ?
+      no_value => error("Could not get task " + i + " from " + ts)
+      a_value => the_value
 
 COMMENT
 editing tasks
@@ -301,11 +356,11 @@ editing tasks
 edit_task(_)with_new_desc(_)in_location(_) : Int x String x Location => Program
   = (i, s, l) =>
     change_tasks_of_location(l)with(_) <-
-    edit_task(i - 1)with_new_desc(s)in_tasks(_)
+    edit_task(i)with_new_desc(s)in_tasks(_)
 
 edit_task(_)with_new_desc(_)in_tasks(_) : Int x String x Tasks => Tasks
   = (i, s, ts) =>
-    split(ts)at_index(i) -> (before, [t, after = ...]) =>
+    split(ts)at_index(i - 1) -> (before, [t, after = ...]) =>
       before + new_task + after
       where
       new_task : Task
@@ -315,16 +370,16 @@ COMMENT
 moving tasks
 
 move_task(_)to(_)in_location(_) : Int x Int x Location => Program
-  = (i, j, p) => change_tasks_of_location(p)with(move_task(i - 1)to(j - 1)in(_))
+  = (i, j, p) => change_tasks_of_location(p)with(move_task(i)to(j)in(_))
 
 move_task(_)to(_)in(_) : Int x Int x Tasks => Tasks
   = (i, j, ts) =>
-    split(ts)at_index(i) -> (before, [elem, after = ...]) =>
+    split(ts)at_index(i - 1) -> (before, [elem, after = ...]) =>
     insert(elem)at_index(j)in(before + after)
 
 insert(_)at_index(_)in(_) : Task x Int x Tasks => Tasks
   = (t, ?, ?)
-    (0, l) => t + l
+    (1, l) => t + l
     (i, []) => error("List not big enough to insert element")
     (i, [t1, ts = ...]) => t1 + insert(t)at_index(i - 1)in(ts)
 
@@ -443,11 +498,12 @@ inspect_task_in_location(_) : Location => Program
           = inspect_task_in_location((tp, p))
 
 inspect_back_in_location(_) : Location => Program
-  = (?, p)
-    [] =>
-      print("Not possible to go back (hit beginning)\n");
-      list_and_choose_action_for_location(([], p))
-    [i, is = ...] => list_and_choose_action_for_location((is, p))
+  = (tp, p) =>
+    remove_last_of(tp) -> ?
+      no_value =>
+        print("Not possible to go back (hit beginning)\n");
+        list_and_choose_action_for_location(([], p))
+      a_value => list_and_choose_action_for_location((the_value, p))
 
 edit_task_in_location(_) : Location => Program
   = l =>
@@ -475,7 +531,7 @@ move_task_from(_) : Path => Program
 
 move_task_by_index(_)from(_)to(_) : Int x Path x Path => Program
   = (i, from_p, to_p) =>
-    remove_and_get_task_of_index(i - 1)from(from_p) >> add_task(_)to_file(to_p);
+    remove_and_get_task_of_index(i)from(from_p) >> add_task(_)to_file(to_p);
     list_and_choose_action_for_file(to_p)
 
 user_task_choice : ProgramWith(Int)
@@ -509,16 +565,40 @@ list_tasks_of_location(_) : Location => Program
   = tasks_from_location(_) o> (_ >> print_two_levels_of_tasks(_))
 
 choose_action_for_location(_) : Location => Program
+  = actions_and_progs_for_location(_) o>
+    say("Choose action by number")list(_)and_choose_from(_)
+
+actions_and_progs_for_location(_) : Location => Strings x Programs
   = l =>
-    say("Choose action by number")list(actions)and_choose_from(progs)
+    l -> ?
+      ([], p) =>
+        (get_file_name_of(p) != ".tasks") -> ?
+          true => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
+          false => (la, apfl)
+      ... => (la, apfl)
     where
     (la, apfl) : Strings x Programs
       = (location_actions, act_progs_for_location(l))
 
-    (actions, progs) : Strings x Programs
-      = l -> ?
-        ([], p) =>
-          (get_file_name_of(p) != ".tasks") -> ?
-            true => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
-            fasle => (la, apfl)
-        ... => (la, apfl)
+COMMENT
+Action type equivalents
+
+actions_for_location(_) : Location => Actions
+  = actions_and_progs_for_location(_) o>
+    actions_from_strings(_)and_programs(_) o>
+    (_ + quit)
+    where
+    quit : Action
+      = ("quit", "q", print("Bye"))
+
+choices_for_location(_) : Location => Program
+  = actions_for_location(_) o> say("Choose action")and_show_choices(_)
+
+tasks_and_choices_for_location(_) : Location => Program
+  = l => list_tasks_of_location(l) ; choices_for_location(l)
+
+tasks_and_choices_for_file(_) : Path => Program
+  = p => tasks_and_choices_for_location(([], p))
+
+dot_tasks_tasks_and_choices : Program
+  = tasks_and_choices_for_file(".tasks")
