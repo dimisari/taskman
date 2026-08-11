@@ -369,6 +369,9 @@ edit_task(_)with_new_desc(_)in_tasks(_) : Int x String x Tasks => Tasks
 COMMENT
 moving tasks
 
+move_task(_)inside(_)in_location(_) : Int x Int x Location => Program
+  = (i, j, p) => change_tasks_of_location(p)with(move_task(i)inside(j)in(_))
+
 move_task(_)to(_)in_location(_) : Int x Int x Location => Program
   = (i, j, p) => change_tasks_of_location(p)with(move_task(i)to(j)in(_))
 
@@ -376,6 +379,11 @@ move_task(_)to(_)in(_) : Int x Int x Tasks => Tasks
   = (i, j, ts) =>
     split(ts)at_index(i - 1) -> (before, [elem, after = ...]) =>
     insert(elem)at_index(j)in(before + after)
+
+move_task(_)inside(_)in(_) : Int x Int x Tasks => Tasks
+  = (i, j, ts) =>
+    add_task(task(i)of(ts))to_tasks(ts)at([j]) ->
+    remove_task_of_index(i)from(_)
 
 insert(_)at_index(_)in(_) : Task x Int x Tasks => Tasks
   = (t, ?, ?)
@@ -514,8 +522,15 @@ edit_task_in_location(_) : Location => Program
 move_task_in_location(_) : Location => Program
   = l =>
     user_task_choice >> i =>
-    user_int_choice_from_prompt("Move to number") >> j =>
-    move_task(i)to(j)in_location(l)
+    print("Move to number or 'i' to move inside another task")and_get_line >> ?
+      "i" =>
+        user_int_choice_from_prompt("Move inside number") >>
+        move_task(i)inside(_)in_location(l)
+      li =>
+        if_string(li)is_int_do(move_task(i)to(_)in_location(l))else(repeat)
+        where
+        repeat : Program
+          = move_task_in_location(l)
 
 move_task_from(_) : Path => Program
   = p =>

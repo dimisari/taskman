@@ -1,4 +1,3 @@
-- Ability to make a task a child task of a sibling task
 - When in the choose action menu add "b" to go back to categories
   - make actions general strings and put together the numbered and the specific ones
 - Adding and deleting categories
@@ -7,7 +6,7 @@
   - It included a newline (that's probably the reason)
   - Unable to recreate the issue
 - Add the ability to move around with arrows in the description of a task
-- When editing give the old description (needs 4)
+  - When editing give the old description
 - Split big tasks at character 80
 - When inspecting the task show the parent task after adding
   - In other words keep showing the parent task after doing actions during inspection
