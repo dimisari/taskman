@@ -7,7 +7,6 @@
   - Unable to recreate the issue
 - Add the ability to move around with arrows in the description of a task
   - When editing give the old description
-- Split big tasks at character 80
 - When inspecting the task show the parent task after adding
   - In other words keep showing the parent task after doing actions during inspection
 - Only show the first 5 tasks

@@ -443,11 +443,52 @@ print_two_levels_of_tasks(_) : Tasks => Program
           print_indexed_task((i, t)) ;
           for_all_in(add_one_indexes_to(t.subtasks), print_indented_indexed(_))
 
-      print_indexed_task(_) : Int x Task => Program
-        = (i, t) => print(i + ". " + t.tdesc)
+print_indexed_task(_) : Int x Task => Program
+  = (i, t) =>
+    print(i + ". " + embed("\n  ")to(t.tdesc)at_last_space_before(77))
 
-      print_indented_indexed(_) : Int x Task => Program
-        = (i, t) => print("  " + i + ". " + t.tdesc)
+print_indented_indexed(_) : Int x Task => Program
+  = (i, t) =>
+    print("  " + i + ". " + embed("\n    ")to(t.tdesc)at_last_space_before(75))
+
+embed(_)to(_)at(_) : String x String x Int => String
+  = (s1, s2, ?)
+    1 => s1 + s2
+    i =>
+      s2 -> ?
+        [] => s2
+        [h, t = ...] => [h] + embed(s1)to(t)at(i - 1)
+
+embed(_)to(_)at_last_space_before(_) : String x String x Int => String
+  = (s1, s2, i) =>
+    find_last_space_of(s2)before(i) -> ?
+      no_value => s2
+      a_value => embed(s1)to(s2)at(the_value)
+
+find_last_space_of(_)before(_) : String x Int => Possibly(Int)
+  = (s, i) => find_last_space_of(s)with_state((1, 0, i))
+
+TUPLE TYPE
+LastSpaceState = Int^3
+(index, last_space, before)
+
+find_last_space_of(_)with_state(_) : String x LastSpaceState => Possibly(Int)
+  = (s, st) =>
+    (st.index == st.before) -> ?
+      true =>
+        st.last_space -> ?
+          0 => no_value
+          ... => a_value--st.last_space
+      false =>
+        s -> ?
+          "" => no_value
+          [' ', t = ...] =>
+            find_last_space_of(t)with_state((st.index + 1, st.index, st.before))
+          [h, t = ...] =>
+            find_last_space_of(t)with_state(new_state)
+            where
+            new_state : LastSpaceState
+              = (st.index + 1, st.last_space, st.before)
 
 print_task(_) : Task => Program
   = _.tdesc o> ("\n" + _ + "\n") o> print(_)
