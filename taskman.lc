@@ -86,7 +86,7 @@ check_tasks_file_and_do_general(_, _) : Program^2 => Program
     does_tasks_file_exist >> ?
       true =>
         print_true_file_msg; print("");
-        list_and_choose_action_for_file(".tasks")
+        tasks_and_choices_for_file(".tasks")
       false => does_not_exist_prog
 
 does_tasks_file_exist : ProgramWith(Bool)
@@ -538,7 +538,7 @@ act_progs_for_location(_) : Location => Programs
       = apply(_ ; list_and_choose)to_all_in(_)
 
     list_and_choose : Program
-      = print(""); list_and_choose_action_for_location(l)
+      = print(""); tasks_and_choices_for_location(l)
 
 add_task_to_location(_) : Location => Program
   = l =>
@@ -559,7 +559,7 @@ inspect_task_in_location(_) : Location => Program
         choose_for_new(_) : Int => Program
           = i =>
             print_task_of_location(new_loc);
-            list_and_choose_action_for_location(new_loc)
+            tasks_and_choices_for_location(new_loc)
             where
             new_loc : Location
               = (tp + i, p)
@@ -572,8 +572,8 @@ inspect_back_in_location(_) : Location => Program
     remove_last_of(tp) -> ?
       no_value =>
         print("Not possible to go back (hit beginning)\n");
-        list_and_choose_action_for_location(([], p))
-      a_value => list_and_choose_action_for_location((the_value, p))
+        tasks_and_choices_for_location(([], p))
+      a_value => tasks_and_choices_for_location((the_value, p))
 
 edit_task_in_location(_) : Location => Program
   = l =>
@@ -609,7 +609,7 @@ move_task_from(_) : Path => Program
 move_task_by_index(_)from(_)to(_) : Int x Path x Path => Program
   = (i, from_p, to_p) =>
     remove_and_get_task_of_index(i)from(from_p) >> add_task(_)to_file(to_p);
-    list_and_choose_action_for_file(to_p)
+    tasks_and_choices_for_file(to_p)
 
 user_task_choice : ProgramWith(Int)
   = user_int_choice_from_prompt("Choose task by number")
@@ -630,20 +630,10 @@ COMMENT
 category choices and programs
 
 programs_from(_) : ListOf(Path)s => Programs
-  = apply(list_and_choose_action_for_file(_))to_all_in(_)
-
-list_and_choose_action_for_location(_) : Location => Program
-  = l => list_tasks_of_location(l) ; choose_action_for_location(l)
-
-list_and_choose_action_for_file(_) : Path => Program
-  = p => list_and_choose_action_for_location(([], p))
+  = apply(tasks_and_choices_for_file(_))to_all_in(_)
 
 list_tasks_of_location(_) : Location => Program
   = tasks_from_location(_) o> (_ >> print_two_levels_of_tasks(_))
-
-choose_action_for_location(_) : Location => Program
-  = actions_and_progs_for_location(_) o>
-    say("Choose action by number")list(_)and_choose_from(_)
 
 actions_and_progs_for_location(_) : Location => Strings x Programs
   = l =>
