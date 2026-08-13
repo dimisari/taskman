@@ -30,8 +30,16 @@ TYPE NICKNAME
 TaskPath = ListOf(Int)s
 
 TUPLE TYPE
-Action = String x String x Program
-(adesc, ainput, aprog)
+Action = String x ActionInput x Program
+(a_desc, a_input, a_prog)
+
+OR TYPE
+ActionInput
+in_desc_same--<in_str : String> | in_desc_diff--<in_tup : InputTuple>
+
+TUPLE TYPE
+InputTuple = String^2
+(in_desc, in_to_read)
 
 TYPE NICKNAME
 Actions = ListOf(Action)s
@@ -138,7 +146,12 @@ menu_from_actions(_) : Actions => String
   = apply(menu_string_from_action(_))to_all_in(_) o> delimit(_)with("  ")
 
 menu_string_from_action(_) : Action => String
-  = a => a.ainput + ". " + a.adesc
+  = a => a_input(a.a_input)to_in_desc_str + ". " + a.a_desc
+
+a_input(_)to_in_desc_str : ActionInput => String
+  = ?
+    in_desc_same => in_str
+    in_desc_diff => in_tup.in_desc
 
 run_choice(_)from_actions(_) : String x Actions => Program
   = (s, ?)
@@ -150,9 +163,17 @@ run_choice(_)from_actions(_) : String x Actions => Program
 
 check_choice(_)against_action(_) : String x Action => StringMatchesAction
   = (s, a) =>
-    (s == a.ainput) -> ?
-      true => matches--a.aprog
+    check_choice(s)against_a_input(a.a_input) -> ?
+      true => matches--a.a_prog
       false => does_not_match
+
+check_choice(_)against_a_input(_) : String x ActionInput => Bool
+  = (s, ai) => s == a_input(ai)to_input_str
+
+a_input(_)to_input_str : ActionInput => String
+  = ?
+    in_desc_same => in_str
+    in_desc_diff => in_tup.in_to_read
 
 actions_from_strings(_)and_programs(_) : Strings x Programs => Actions
   = actions_from_strings(_)and_programs(_)starting_at(1)
@@ -165,7 +186,7 @@ actions_from_strings(_)and_programs(_)starting_at(_)
       action + actions_from_strings(ss)and_programs(ps)starting_at(i + 1)
       where
       action : Action
-        = (s, (i)to_string, p)
+        = (s, in_desc_same--(i)to_string, p)
 
 COMMENT
 say and list choices
@@ -645,7 +666,7 @@ actions_for_location(_) : Location => Actions
     (_ + quit)
     where
     quit : Action
-      = ("quit", "q", print("Bye"))
+      = ("quit", in_desc_diff--("Enter", ""), print("Bye"))
 
 choices_for_location(_) : Location => Program
   = actions_for_location(_) o> say("Choose action")and_show_choices(_)
