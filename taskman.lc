@@ -108,14 +108,14 @@ choose_from_directory(_) : Path => Program
   = choices_and_programs_from_dir(_) o> (_ >> choose_task_category(_, _))
 
 choose_task_category(_, _) : Strings x Programs => Program
-  = (choices, programs) => say(to_say)list(choices)and_choose_from(programs)
-    where
-    to_say : String
-      = "Choose task category to show by number"
+  = strs_and_progs(_)to_actions_with_quit o> show_category_choices(_)
 
 say(_)list(_)and_choose_from(_) : String x Strings x Programs => Program
-  = (to_say, choices, programs) =>
-    say(to_say)and_list_choices(choices) ; choose_from(programs)
+  = (to_say, cs, ps) =>
+    say(to_say)and_show_choices(strs_and_progs((cs, ps))to_actions_with_quit)
+
+show_category_choices(_) : Actions => Program
+  = say("Choose task category to show by number")and_show_choices(_)
 
 say(_)and_show_choices(_) : String x Actions => Program
   = (to_say, choices) => print("\n" + to_say); show_choices(choices)
@@ -651,9 +651,10 @@ COMMENT
 Action type equivalents
 
 actions_for_location(_) : Location => Actions
-  = actions_and_progs_for_location(_) o>
-    actions_from_strings(_)and_programs(_) o>
-    (_ + quit)
+  = actions_and_progs_for_location(_) o> strs_and_progs(_)to_actions_with_quit
+
+strs_and_progs(_)to_actions_with_quit : Strings x Programs => Actions
+  = actions_from_strings(_)and_programs(_) o> (_ + quit)
     where
     quit : Action
       = ("quit", in_desc_diff--("Enter", ""), print("Bye"))
@@ -666,6 +667,3 @@ tasks_and_choices_for_location(_) : Location => Program
 
 tasks_and_choices_for_file(_) : Path => Program
   = p => tasks_and_choices_for_location(([], p))
-
-dot_tasks_tasks_and_choices : Program
-  = tasks_and_choices_for_file(".tasks")
