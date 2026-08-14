@@ -120,27 +120,13 @@ show_category_choices(_) : Actions => Program
 say(_)and_show_choices(_) : String x Actions => Program
   = (to_say, choices) => print("\n" + to_say); show_choices(choices)
 
-choose_from(_) : Programs => Program
-  = programs =>
-    get_line >> ?
-      "" => do_nothing
-      l =>
-        if_string(l)is_int_do(choose_program(_))else(choose_from(programs))
-        where
-        choose_program(_) : Int => Program
-          = i =>
-            print("") ;
-            elem(i)of(programs) -> ?
-              no_value => print(i + " is invalid") ; choose_from(programs)
-              a_value => the_value
-
 COMMENT
-show choices using the Action type
+show choices
 
 show_choices(_) : Actions => Program
   = as =>
     print(menu_from_actions(as)) ; get_line >> l =>
-    run_choice(l)from_actions(as)
+    print(""); run_choice(l)from_actions(as)
 
 menu_from_actions(_) : Actions => String
   = apply(menu_string_from_action(_))to_all_in(_) o> delimit(_)with("  ")
@@ -175,33 +161,18 @@ a_input(_)to_input_str : ActionInput => String
     in_desc_same => in_str
     in_desc_diff => in_tup.in_to_read
 
-actions_from_strings(_)and_programs(_) : Strings x Programs => Actions
-  = actions_from_strings(_)and_programs(_)starting_at(1)
+strs_and_progs(_)to_numbered_actions: Strings x Programs => Actions
+  = strs_and_progs(_)to_numbered_actions_starting_at(1)
 
-actions_from_strings(_)and_programs(_)starting_at(_)
-  : Strings x Programs x Int => Actions
-  = (?, ?, i)
+strs_and_progs(_)to_numbered_actions_starting_at(_)
+  : (Strings x Programs) x Int => Actions
+  = (?, i)
     ([],[]) => []
     ([s, ss = ...], [p, ps = ...]) =>
-      action + actions_from_strings(ss)and_programs(ps)starting_at(i + 1)
+      action + strs_and_progs((ss, ps))to_numbered_actions_starting_at(i + 1)
       where
       action : Action
         = (s, in_desc_same--(i)to_string, p)
-
-COMMENT
-say and list choices
-
-say(_)and_list_choices(_) : String x Strings => Program
-  = (to_say, choices) => print("\n" + to_say) ; list_choices(choices)
-
-list_choices(_) : Strings => Program
-  = choices(_)to_string o> print(_)
-
-add_numbers_to_choices(_) : Strings => Strings
-  = add_one_indexes_to(_) o> apply((i, s) => i + ". " + s + "  ")to_all_in(_)
-
-choices(_)to_string : Strings => String
-  = add_numbers_to_choices(_) o> concat_lists(_) o> (_ + "(Enter to quit)" )
 
 COMMENT
 paths
@@ -219,15 +190,16 @@ COMMENT
 tasks from file
 
 tasks_from_location(_) : Location => ProgramWith(Tasks)
-  = (tp, p) =>
-    apply(tasks_of_path(tp)from_lines(_))inside(read_file(p)into_lines)
+  = (tp, p) => apply(tasks_of_path(tp)from_lines(_))to_lines_of_file(p)
 
 task_from_location(_) : Location => ProgramWith(Task)
-  = (tp, p) =>
-    apply(task_of_path(tp)from_lines(_))inside(read_file(p)into_lines)
+  = (tp, p) => apply(task_of_path(tp)from_lines(_))to_lines_of_file(p)
 
 tasks_from_file(_) : Path => ProgramWith(Tasks)
-  = read_file(_)into_lines o> apply(tasks_from_lines(_))inside(_)
+  = apply(tasks_from_lines(_))to_lines_of_file(_)
+
+apply(_)to_lines_of_file(_) : (Lines => T1) x Path => ProgramWith(T1)
+  = (f, p) => apply(f)inside(read_file(p)into_lines)
 
 read_file(_)into_lines : Path => ProgramWith(Strings)
   = read_file(_) o> apply(split(_)to_lines)inside(_)
@@ -246,8 +218,7 @@ task_of_path(_)from_lines(_) : TaskPath x Strings => Task
 task_of_path(_)from(_) : TaskPath x Tasks => Task
   = (?, ts)
     [] => error("Trying to get task with no index")
-    [i] => task(i)of(ts)
-    [i, is = ...] => task_of_path(is)from(task(i)of(ts).subtasks)
+    [i, is = ...] => task(i)of(tasks_of_path(is)from(ts))
 
 tasks_from_lines(_) : Lines => Tasks
   = tasks_of_level(0)from_lines(_) o> ?
@@ -654,7 +625,7 @@ actions_for_location(_) : Location => Actions
   = actions_and_progs_for_location(_) o> strs_and_progs(_)to_actions_with_quit
 
 strs_and_progs(_)to_actions_with_quit : Strings x Programs => Actions
-  = actions_from_strings(_)and_programs(_) o> (_ + quit)
+  = strs_and_progs(_)to_numbered_actions o> (_ + quit)
     where
     quit : Action
       = ("quit", in_desc_diff--("Enter", ""), print("Bye"))
