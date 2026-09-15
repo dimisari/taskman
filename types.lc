@@ -1,0 +1,47 @@
+OR TYPE
+ActionInput
+in_desc_same--<in_str : String> | in_desc_diff--<in_tup : InputTuple>
+
+TUPLE TYPE
+InputTuple = String^2
+(in_desc, in_to_read)
+
+TUPLE TYPE
+Task = String x Tasks
+(tdesc, subtasks)
+
+TYPE NICKNAME
+Tasks = ListOf(Task)s
+
+TYPE NICKNAME
+Path = String
+
+TYPE NICKNAME
+Paths = ListOf(Path)s
+
+TYPE NICKNAME
+Line = String
+
+TYPE NICKNAME
+Lines = ListOf(Line)s
+
+TYPE NICKNAME
+Programs = ListOf(Program)s
+
+TYPE NICKNAME
+Location = TaskPath x Path
+
+TYPE NICKNAME
+TaskPath = ListOf(Int)s
+
+TUPLE TYPE
+Action = String x T.ActionInput x Program
+(a_desc, a_input, a_prog)
+
+TYPE NICKNAME
+Actions = ListOf(Action)s
+
+OR TYPE
+StringMatchesAction
+matches--<match_prog : Program> | does_not_match
+
