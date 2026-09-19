@@ -45,3 +45,6 @@ OR TYPE
 StringMatchesAction
 matches--<match_prog : Program> | does_not_match
 
+OR TYPE
+BIntOrOther
+b | int--<i : Int> | other--<s : String>

@@ -1,5 +1,3 @@
-- When in the choose action menu add "b" to go back to categories
-  - make actions general strings and put together the numbered and the specific ones
 - Adding and deleting categories
 - check all the split at index and add catching functions for when expected pattern does not match because if it breaks it deletes all the task
   - pasted something from the terminal after "New Description" and it broke
@@ -11,4 +9,4 @@
   - In other words keep showing the parent task after doing actions during inspection
 - Only show the first 5 tasks
   - Add a mechanism to scroll to bigger number tasks if needed
-- When changing your mind after an action is chosen add ability to go back instead of having to ctrl+c
+- In the original menu when you don't enter a valid choice the program ends. Make it so that in shows the menu again after the message

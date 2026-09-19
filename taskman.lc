@@ -78,8 +78,7 @@ show choices
 
 show_choices(_) : T.Actions => Program
   = as =>
-    print(menu_from_actions(as)) ; get_line >> l =>
-    print(""); run_choice(l)from_actions(as)
+    print(menu_from_actions(as)) ; get_line >> run_choice(_)from_actions(as)
 
 menu_from_actions(_) : T.Actions => String
   = apply(menu_string_from_action(_))to_all_in(_) o> delimit(_)with("  ")
@@ -125,7 +124,7 @@ strs_and_progs(_)to_numbered_actions_starting_at(_)
       action + strs_and_progs((ss, ps))to_numbered_actions_starting_at(i + 1)
       where
       action : T.Action
-        = (s, T.in_desc_same--(i)to_string, p)
+        = (s, T.in_desc_same--(i)to_string, print(""); p)
 
 COMMENT
 paths
@@ -230,7 +229,8 @@ change_tasks_of_location(_)with(_) : T.Location x (T.Tasks => T.Tasks) => Progra
 change_tasks_of(_)with(_) : T.Path x (T.Tasks => T.Tasks) => Program
   = (p, f(_)) => tasks_from_file(p) >> f(_) o> write_tasks(_)to_file(p)
 
-change_tasks(_)at(_)with(_) : T.Tasks x T.TaskPath x (T.Tasks => T.Tasks) => T.Tasks
+change_tasks(_)at(_)with(_)
+  : T.Tasks x T.TaskPath x (T.Tasks => T.Tasks) => T.Tasks
   = (ts, ?, f(_))
     [] => f(ts)
     [i, is = ...] =>
@@ -376,7 +376,8 @@ print_task(_)with_indetation(_) : T.Task x Int => Program
 print_tasks(_) : T.Tasks => Program
   = ?
     [] => print("No tasks")
-    ts => for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.T.tdesc))
+    ts =>
+      for_all_in(add_one_indexes_to(ts), (i, t) => print(i + ". " + t.T.tdesc))
 
 print_two_levels_of_tasks(_) : T.Tasks => Program
   = ?
@@ -467,30 +468,34 @@ act_progs_for_location(_) : T.Location => T.Programs
 
 add_task_to_location(_) : T.Location => Program
   = l =>
-    print("Describe the task")and_get_line >> add_str(_)as_task_to_location(l)
+    print("Describe the task" + or_back_message)and_get_line >> ?
+      "b" => do_nothing
+      s => add_str(s)as_task_to_location(l)
 
 remove_task_from_location(_) : T.Location => Program
   = l =>
-    user_int_choice_from_prompt("Remove task by number") >>
-    remove_task_at_index(_)in_location(l)
+    print(message)and_check_answer_is_b_int_or_other >>
+    if(_)b_do_nothing_if_int_do(int(_)p)else_do(remove_task_from_location(l))
+    where
+    message : String
+      = "Remove task by number" + or_back_message
+
+    int(_)p : Int => Program
+      = remove_task_at_index(_)in_location(l)
 
 inspect_task_in_location(_) : T.Location => Program
-  = (tp, p) =>
-    print("Choose task by number or \"b\" for back")and_get_line >> ?
-      "b" => print(""); inspect_back_in_location((tp, p))
-      l =>
-        if_string(l)is_int_do(choose_for_new(_))else(choose_for_same)
-        where
-        choose_for_new(_) : Int => Program
-          = i =>
-            print_task_of_location(new_loc);
-            tasks_and_choices_for_location(new_loc)
-            where
-            new_loc : T.Location
-              = (tp + i, p)
+  = l =>
+    print(choose_task_message)and_check_answer_is_b_int_or_other >> ?
+      T.b => print(""); inspect_back_in_location(l)
+      T.int => inspect_task(i)in_location(l)
+      T.other => print(s)not_integer_message; inspect_task_in_location(l)
 
-        choose_for_same : Program
-          = inspect_task_in_location((tp, p))
+inspect_task(_)in_location(_) : Int x T.Location => Program
+  = (i, (tp, p)) =>
+    print_task_of_location(new_loc) ; tasks_and_choices_for_location(new_loc)
+    where
+    new_loc : T.Location
+      = (tp + i, p)
 
 inspect_back_in_location(_) : T.Location => Program
   = (tp, p) =>
@@ -502,26 +507,53 @@ inspect_back_in_location(_) : T.Location => Program
 
 edit_task_in_location(_) : T.Location => Program
   = l =>
-    user_task_choice >> i =>
-    print("New description")and_get_line >>
-    edit_task(i)with_new_desc(_)in_location(l)
+    choose_task_and_if_int(int(_)p)else(edit_task_in_location(l))
+    where
+    int(_)p : Int => Program
+      = i =>
+        print("New description")and_get_line >>
+        edit_task(i)with_new_desc(_)in_location(l)
 
 move_task_in_location(_) : T.Location => Program
   = l =>
-    user_task_choice >> i =>
-    print("Move to number or 'i' to move inside another task")and_get_line >> ?
-      "i" =>
-        user_int_choice_from_prompt("Move inside number") >>
-        move_task(i)inside(_)in_location(l)
-      li =>
-        if_string(li)is_int_do(move_task(i)to(_)in_location(l))else(repeat)
-        where
-        repeat : Program
-          = move_task_in_location(l)
+    choose_task_and_if_int(move_task(_)in_location(l))else(repeat)
+    where
+    repeat : Program
+      = move_task_in_location(l)
+
+move_task(_)in_location(_) : Int x T.Location => Program
+  = (j, l) =>
+    print(message)and_check_answer_is_b_int_or_other >> ?
+      T.b => move_task_in_location(l)
+      T.int => move_task(j)to(i)in_location(l)
+      T.other =>
+        s -> ?
+          "i" => move_task(j)inside_other_in_location(l)
+          ... => print(s)not_integer_message ; move_task(j)in_location(l)
+    where
+    message : String
+      = "Move to number or \"i\" to move inside another task" + or_back_message
+
+move_task(_)inside_other_in_location(_) : Int x T.Location => Program
+  = (j, l) =>
+    print(message)and_check_answer_is_b_int_or_other >> ?
+      T.b => move_task(j)in_location(l)
+      T.int => move_task(j)inside(i)in_location(l)
+      T.other =>
+        print(s)not_integer_message; move_task(j)inside_other_in_location(l)
+    where
+    message : String
+      = "Move inside number" + or_back_message
 
 move_task_from(_) : T.Path => Program
   = p =>
-    user_task_choice >> i =>
+    print(choose_task_message)and_check_answer_is_b_int_or_other >> ?
+      T.b => print(""); tasks_and_choices_for_file(p)
+      T.int => move_task(i)from(p)
+      T.other => print(s)not_integer_message ; move_task_from(p)
+
+move_task(_)from(_) : Int x T.Path => Program
+  = (i, p) =>
     choices_and_paths_from_dir(get_directory_of(p)) >> (cs, ps) =>
       say(to_say)list(cs)and_choose_from(programs)
       where
@@ -536,20 +568,37 @@ move_task_by_index(_)from(_)to(_) : Int x T.Path x T.Path => Program
     remove_and_get_task_of_index(i)from(from_p) >> add_task(_)to_file(to_p);
     tasks_and_choices_for_file(to_p)
 
-user_task_choice : ProgramWith(Int)
-  = user_int_choice_from_prompt("Choose task by number")
+choose_task_and_if_int(_)else(_) : (Int => Program) x Program => Program
+  = (int(_)p, p) =>
+    print(choose_task_message)and_check_answer_is_b_int_or_other >>
+    if(_)b_do_nothing_if_int_do(int(_)p)else_do(p)
 
-user_int_choice_from_prompt(_) : String => ProgramWith(Int)
-  = s =>
-    print(s)and_get_line >>
-    if_string(_)is_int_do(wrap(_))else(user_int_choice_from_prompt(s))
+print(_)and_check_answer_is_b_int_or_other : String => ProgramWith(T.BIntOrOther)
+  = print(_)and_get_line o> apply(check(_)is_b_int_or_other)inside(_)
 
-if_string(_)is_int_do(_)else(_)
-  : String x (Int => ProgramWith(T1)) x ProgramWith(T1) => ProgramWith(T1)
-  = (s, f(_), p) =>
-    from_string(s) -> ?
-      a_value => f(the_value)
-      no_value => print("\""+ s + "\" is not an integer\n"); p
+check(_)is_b_int_or_other : String => T.BIntOrOther
+  = ?
+    "b" => T.b
+    s =>
+      from_string(s) -> ?
+        a_value => T.int--the_value
+        no_value => T.other--s
+
+if(_)b_do_nothing_if_int_do(_)else_do(_)
+  : T.BIntOrOther x (Int => Program) x Program => Program
+  = (?, int(_)p, other_p)
+    T.b => do_nothing
+    T.int => int(i)p
+    T.other => print(s)not_integer_message ; other_p
+
+print(_)not_integer_message : String => Program
+  = s => print("\""+ s + "\" is not an integer\n")
+
+or_back_message : String
+  = " or \"b\" for back"
+
+choose_task_message : String
+  = "Choose task by number" + or_back_message
 
 COMMENT
 category choices and programs
@@ -561,28 +610,45 @@ list_tasks_of_location(_) : T.Location => Program
   = tasks_from_location(_) o> (_ >> print_two_levels_of_tasks(_))
 
 actions_and_progs_for_location(_) : T.Location => Strings x T.Programs
-  = l =>
-    l -> ?
-      ([], p) =>
-        (get_file_name_of(p) != ".tasks") -> ?
-          true => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
-          false => (la, apfl)
-      ... => (la, apfl)
+  = (tp, p) =>
+    is_location((tp, p))category_file -> ?
+      true => (la + ["Move elsewhere"], apfl + [move_task_from(p)])
+      false => (la, apfl)
     where
     (la, apfl) : Strings x T.Programs
-      = (location_actions, act_progs_for_location(l))
+      = (location_actions, act_progs_for_location((tp, p)))
+
+is_location(_)category_file : T.Location => Bool
+  = ?
+    ([], p) =>
+      (get_file_name_of(p) != ".tasks") -> ?
+        true => true
+        false => false
+    ... => false
 
 COMMENT
 T.Action type equivalents
 
 actions_for_location(_) : T.Location => T.Actions
-  = actions_and_progs_for_location(_) o> strs_and_progs(_)to_actions_with_quit
+  = l =>
+    actions_and_progs_for_location(l) -> strs_and_progs(_)to_actions_with_quit ->
+    add_back_to_categories_if(l)is_category_file_with_actions(_)
 
 strs_and_progs(_)to_actions_with_quit : Strings x T.Programs => T.Actions
   = strs_and_progs(_)to_numbered_actions o> (_ + quit)
     where
     quit : T.Action
       = ("quit", T.in_desc_diff--("Enter", ""), print("Bye"))
+
+add_back_to_categories_if(_)is_category_file_with_actions(_)
+  : T.Location x T.Actions => T.Actions
+  = ((tp, p), as) =>
+    is_location((tp, p))category_file -> ?
+      true => as + back_action
+      false => as
+    where
+    back_action : T.Action
+      = ("back", T.in_desc_same--"b", choose_from_directory(get_directory_of(p)))
 
 choices_for_location(_) : T.Location => Program
   = actions_for_location(_) o> say("Choose action")and_show_choices(_)
